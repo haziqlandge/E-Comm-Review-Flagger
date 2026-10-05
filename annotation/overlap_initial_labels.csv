@@ -1,0 +1,10 @@
+ID,Annotator_A_Haziq,Annotator_B_Aditya
+FK127,Neutral,Positive
+FK133,Neutral,Negative
+FK141,Positive,Neutral
+FK144,Positive,Negative
+FK149,Positive,Neutral
+FK155,Negative,Neutral
+FK166,Positive,Neutral
+FK172,Negative,Neutral
+FK173,Neutral,Positive

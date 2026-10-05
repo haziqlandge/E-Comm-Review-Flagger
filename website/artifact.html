@@ -1,0 +1,924 @@
+<title>Flipkart Review Annotation</title>
+<meta name="description" content="CCE-2 NLP activity: 300 Flipkart reviews annotated for sentiment and aspect, with agreement, findings and a browsable dataset.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..700,0..100;1,9..144,300..700,0..100&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap">
+<style>
+/* Layout: one idea per screen, left-aligned, generous air; colour only where it carries meaning
+   (blue = positive, rose = negative, gray = neutral, gold = the annotator's highlighter). */
+:root{
+  --bg:#F7F8FA; --surface:#FFFFFF; --ink:#0F1B2A; --muted:#566273; --faint:#8995A4; --line:#E3E7EC; --soft:#EEF1F5;
+  --pos:#2A66B0; --neg:#C0506A; --neu:#8A94A3;
+  --pos-bg:rgba(42,102,176,.10); --neg-bg:rgba(192,80,106,.10); --neu-bg:rgba(138,148,163,.14);
+  --gold:#DDAA33; --hl:rgba(221,170,51,.34); --gold-ink:#7A5607;
+  --ok:#2E7457; --warn:#9A6510; --bad:#A63D2C;
+  --heat:15,27,42;
+  --f-display:"Fraunces", "Iowan Old Style", Georgia, serif;
+  --f-body:"Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono:"Azeret Mono", "Cascadia Mono", ui-monospace, Consolas, monospace;
+  --r:14px; --ease:cubic-bezier(.2,.7,.2,1);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D141D; --surface:#131C27; --ink:#E8ECF1; --muted:#9BA7B6; --faint:#6F7C8D; --line:#222E3C; --soft:#18222F;
+    --pos:#5A8FD0; --neg:#CC6479; --neu:#7D8896;
+    --pos-bg:rgba(90,143,208,.16); --neg-bg:rgba(204,100,121,.16); --neu-bg:rgba(125,136,150,.18);
+    --hl:rgba(221,170,51,.28); --gold-ink:#E7C266; --ok:#5DB58C; --warn:#E0A84A; --bad:#E07B67; --heat:232,236,241;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D141D; --surface:#131C27; --ink:#E8ECF1; --muted:#9BA7B6; --faint:#6F7C8D; --line:#222E3C; --soft:#18222F;
+  --pos:#5A8FD0; --neg:#CC6479; --neu:#7D8896;
+  --pos-bg:rgba(90,143,208,.16); --neg-bg:rgba(204,100,121,.16); --neu-bg:rgba(125,136,150,.18);
+  --hl:rgba(221,170,51,.28); --gold-ink:#E7C266; --ok:#5DB58C; --warn:#E0A84A; --bad:#E07B67; --heat:232,236,241;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:80px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1.0625rem;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-underline-offset:3px;text-decoration-color:var(--gold);text-decoration-thickness:2px}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:6px}
+button{font:inherit;color:inherit;cursor:pointer}
+h1,h2,h3{font-family:var(--f-display);font-weight:500;margin:0;text-wrap:balance;letter-spacing:-.02em;line-height:1.08;font-variation-settings:"SOFT" 40,"opsz" 96}
+p{margin:0}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:clamp(18px,5vw,48px)}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+[hidden]{display:none!important}
+
+/* nav */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.nav .wrap{display:flex;align-items:center;gap:28px;height:64px}
+.logo{font-weight:600;font-size:.95rem;text-decoration:none;display:flex;align-items:center;gap:10px;white-space:nowrap}
+.logo i{width:18px;height:18px;border-radius:5px;background:linear-gradient(180deg,transparent 50%,var(--gold) 50%);box-shadow:inset 0 0 0 1.5px var(--ink)}
+.links{display:flex;gap:4px;margin-left:auto}
+.links a{text-decoration:none;color:var(--muted);font-size:.92rem;padding:6px 12px;border-radius:999px;transition:color .2s,background .2s}
+.links a:hover,.links a.on{color:var(--ink);background:var(--soft)}
+.theme{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;flex:none}
+.theme svg{width:17px;height:17px}
+
+/* sections */
+section{padding-block:clamp(72px,11vw,136px)}
+.kicker{font-size:.85rem;font-weight:600;color:var(--gold-ink);letter-spacing:.01em;margin-bottom:14px}
+h2{font-size:clamp(2rem,4.2vw,3.1rem)}
+.intro{color:var(--muted);font-size:1.12rem;max-width:58ch;margin-top:18px}
+.head{max-width:760px}
+
+/* hero */
+.hero{padding-block:clamp(48px,8vw,104px) clamp(56px,9vw,120px)}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(36px,6vw,80px);align-items:center}
+.hero h1{font-size:clamp(2.9rem,7vw,5.6rem);font-weight:450;letter-spacing:-.035em;line-height:1.02;font-variation-settings:"SOFT" 60,"opsz" 144}
+.hero h1 em{font-weight:350}
+.hero h1 .w{display:inline-block}
+.mark{background-image:linear-gradient(transparent 60%,var(--hl) 60%,var(--hl) 92%,transparent 92%);background-repeat:no-repeat;background-size:100% 100%}
+.hero .intro{margin-top:26px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,max-content));gap:20px clamp(24px,4vw,44px);margin-top:40px}
+.stat b{display:block;font-family:var(--f-display);font-weight:500;font-size:2.3rem;line-height:1;letter-spacing:-.02em;font-variant-numeric:lining-nums tabular-nums}
+.stat span{display:block;color:var(--muted);font-size:.88rem;margin-top:8px;max-width:20ch;line-height:1.4}
+
+.review{background:var(--surface);border-radius:20px;padding:28px 28px 22px;box-shadow:0 1px 2px rgba(15,27,42,.04),0 24px 60px -32px rgba(15,27,42,.35);min-width:0}
+.review-top{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--faint);font-size:.82rem}
+.stars{color:var(--gold);letter-spacing:1.5px;font-size:.92rem;white-space:nowrap}
+.stars s{color:var(--line);text-decoration:none}
+.quote{font-family:var(--f-display);font-size:clamp(1.25rem,2.2vw,1.55rem);line-height:1.45;margin-top:18px;min-height:6.6em;font-weight:400;font-variation-settings:"opsz" 36,"SOFT" 70}
+.verdicts{display:flex;flex-wrap:wrap;gap:12px 28px;margin-top:22px;padding-top:18px;border-top:1px solid var(--line);font-size:.86rem;color:var(--muted)}
+.verdicts > div{display:flex;align-items:center;gap:10px}
+.why{font-size:.9rem;color:var(--muted);margin-top:12px;line-height:1.5;min-height:3em}
+.review-foot{display:flex;align-items:center;gap:8px;margin-top:20px}
+.pips{display:flex;gap:6px;margin-right:auto}
+.pips button{width:8px;height:8px;border-radius:50%;border:0;background:var(--line);padding:0;transition:width .3s var(--ease),background .3s}
+.pips button[aria-current="true"]{width:22px;border-radius:4px;background:var(--ink)}
+.ghost{border:0;background:transparent;color:var(--muted);font-size:.85rem;padding:6px 10px;border-radius:8px}
+.ghost:hover{background:var(--soft);color:var(--ink)}
+
+/* label pill */
+.lbl{display:inline-flex;align-items:center;gap:7px;font-size:.82rem;font-weight:600;padding:3px 11px 3px 9px;border-radius:999px;white-space:nowrap;line-height:1.5}
+.lbl::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.lbl.P{color:var(--pos);background:var(--pos-bg)}
+.lbl.N{color:var(--neg);background:var(--neg-bg)}
+.lbl.U{color:var(--muted);background:var(--neu-bg)}
+.lbl.N::before{border-radius:1.5px;transform:rotate(45deg)}
+.lbl.U::before{border-radius:1px;height:3px}
+.strike{opacity:.55;text-decoration:line-through;text-decoration-thickness:1.5px}
+
+/* cue words (shown in the hero, the practice reveal, and on demand in the list) */
+.cue{border-radius:3px;padding-inline:.06em;background-repeat:no-repeat;background-size:100% 100%}
+.cue-neg{background-image:linear-gradient(var(--hl),var(--hl))}
+.cue-con{box-shadow:inset 0 -2px 0 var(--faint)}
+.cue-p{background-image:linear-gradient(var(--pos-bg),var(--pos-bg))}
+.cue-n{background-image:linear-gradient(var(--neg-bg),var(--neg-bg))}
+.plain .cue{background-image:none!important;box-shadow:none!important}
+
+/* process */
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(24px,4vw,48px);margin-top:clamp(44px,6vw,64px)}
+.step{min-width:0}
+.step .n{font-family:var(--f-mono);font-size:.78rem;color:var(--faint)}
+.step b{display:block;font-family:var(--f-display);font-weight:500;font-size:2.4rem;line-height:1;margin-top:16px;letter-spacing:-.02em}
+.step h3{font-family:var(--f-body);font-size:1.02rem;font-weight:600;letter-spacing:0;margin-top:14px}
+.step p{color:var(--muted);font-size:.94rem;margin-top:6px;line-height:1.55}
+.rail{height:2px;background:var(--line);margin-top:14px;border-radius:2px;position:relative;overflow:hidden}
+.rail i{position:absolute;inset:0;background:var(--ink);transform-origin:left}
+
+details.more{margin-top:clamp(40px,5vw,56px);border-top:1px solid var(--line)}
+details.more + details.more{margin-top:0}
+details.more summary{list-style:none;display:flex;align-items:baseline;gap:14px;padding:20px 0;cursor:pointer;font-weight:600;border-bottom:1px solid var(--line)}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary span{color:var(--muted);font-weight:400;font-size:.92rem}
+details.more summary::after{content:"+";margin-left:auto;font-size:1.4rem;font-weight:300;color:var(--muted);transition:transform .3s var(--ease)}
+details.more[open] summary::after{transform:rotate(45deg)}
+.more-body{padding:28px 0 36px;border-bottom:1px solid var(--line)}
+.defs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}
+.def h4{margin:0 0 8px;font-family:var(--f-display);font-weight:500;font-size:1.35rem;color:var(--c)}
+.def p{color:var(--muted);font-size:.94rem}
+.def q{display:block;margin-top:12px;font-family:var(--f-display);font-style:italic;font-size:.98rem;color:var(--ink);quotes:"\201C" "\201D"}
+.rules{list-style:none;padding:0;margin:32px 0 0;columns:2;column-gap:48px}
+.rules li{break-inside:avoid;display:flex;gap:14px;padding:9px 0;font-size:.95rem;color:var(--muted)}
+.rules li b{font-family:var(--f-mono);font-weight:500;font-size:.8rem;color:var(--gold-ink);min-width:2.2em;padding-top:2px}
+.rules li em{font-style:normal;font-size:.72rem;font-weight:600;color:var(--gold-ink);margin-left:6px}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px 32px}
+.facts dt{font-size:.82rem;color:var(--faint)}
+.facts dd{margin:4px 0 0;font-size:.98rem}
+
+/* agreement */
+.agree{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(36px,6vw,80px);align-items:start;margin-top:clamp(44px,6vw,64px)}
+.kappa b{display:block;font-family:var(--f-display);font-weight:400;font-size:clamp(4.5rem,11vw,8rem);line-height:.9;letter-spacing:-.04em;font-variation-settings:"opsz" 144}
+.kappa > p{color:var(--muted);margin-top:16px;max-width:40ch}
+.scale{margin-top:44px;position:relative;padding-bottom:4px}
+.scale-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--soft) 0 60%,var(--hl) 60% 80%,var(--soft) 80%)}
+.scale-ticks{display:flex;justify-content:space-between;font-size:.74rem;color:var(--faint);margin-top:8px}
+.pin{position:absolute;top:-30px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;font-size:.76rem;white-space:nowrap}
+.pin i{width:2px;height:16px;background:var(--faint);margin-top:4px}
+.pin.main{font-weight:600}
+.pin.main i{background:var(--ink);height:22px;margin-top:-2px}
+.pin.below{top:12px;flex-direction:column-reverse}
+.pin.below i{margin:0 0 4px}
+.scale-note{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:36px;font-size:.88rem;color:var(--muted)}
+.scale-note span::before{content:"";display:inline-block;width:10px;height:2px;background:var(--faint);vertical-align:middle;margin-right:8px}
+.scale-note span.m::before{background:var(--ink)}
+
+.matrix{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));gap:6px;font-size:.85rem}
+.matrix .h{color:var(--faint);font-size:.78rem;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px}
+.matrix .rh{justify-content:flex-end;align-items:center;padding:0 10px 0 0}
+.matrix button{border:0;border-radius:12px;aspect-ratio:1.35;display:grid;place-items:center;font-family:var(--f-display);font-size:1.6rem;font-weight:450;background:rgba(var(--heat),var(--a));color:var(--ink);transition:transform .2s var(--ease),box-shadow .2s}
+.matrix button.dk{color:var(--bg)}
+.matrix button:hover{transform:scale(1.04)}
+.matrix button[aria-pressed="true"]{box-shadow:0 0 0 3px var(--gold)}
+.matrix-cap{color:var(--muted);font-size:.88rem;margin-top:14px}
+.picked{margin-top:18px;display:grid;gap:0}
+.picked .row{display:grid;grid-template-columns:56px minmax(0,1fr);gap:12px;padding:12px 0;border-top:1px solid var(--line);font-size:.93rem}
+.picked .row .id{font-family:var(--f-mono);font-size:.74rem;color:var(--faint);padding-top:3px}
+
+.disputes{margin-top:clamp(56px,7vw,80px)}
+.disputes h3{font-size:1.5rem}
+.drow{border-bottom:1px solid var(--line)}
+.drow:first-of-type{border-top:1px solid var(--line);margin-top:20px}
+.drow summary{list-style:none;display:grid;grid-template-columns:62px minmax(0,1fr) auto 20px;gap:16px;align-items:center;padding:16px 0;cursor:pointer}
+.drow summary::-webkit-details-marker{display:none}
+.drow summary::after{content:"+";color:var(--muted);font-size:1.2rem;text-align:right;transition:transform .3s var(--ease)}
+.drow[open] summary::after{transform:rotate(45deg)}
+.drow .id{font-family:var(--f-mono);font-size:.76rem;color:var(--faint)}
+.drow .t{font-size:.97rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drow .votes{display:flex;align-items:center;gap:6px}
+.drow .votes .arrow{color:var(--faint);font-size:.8rem}
+.drow .body{padding:0 0 20px 78px;color:var(--muted);font-size:.95rem;display:grid;gap:10px}
+.drow .body .full{color:var(--ink)}
+
+/* practice */
+.trybox{max-width:720px;margin-top:clamp(40px,5vw,56px)}
+.progress{height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--ink);width:0;transition:width .5s var(--ease)}
+.try-meta{display:flex;justify-content:space-between;gap:12px;margin-top:14px;color:var(--faint);font-size:.85rem}
+.try-text{font-family:var(--f-display);font-size:clamp(1.45rem,3vw,2rem);line-height:1.4;margin-top:28px;font-weight:400;font-variation-settings:"opsz" 48,"SOFT" 70;min-height:4.2em}
+.choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:32px}
+.choices button{border:1.5px solid var(--line);background:var(--surface);border-radius:14px;padding:16px 10px;font-weight:600;font-size:1rem;display:flex;flex-direction:column;align-items:center;gap:4px;transition:border-color .2s,background .2s,transform .2s var(--ease)}
+.choices button small{font-family:var(--f-mono);font-weight:400;font-size:.7rem;color:var(--faint)}
+.choices button:hover:not(:disabled){transform:translateY(-2px)}
+.choices .P{color:var(--pos)} .choices .N{color:var(--neg)} .choices .U{color:var(--muted)}
+.choices .P:hover:not(:disabled),.choices .P.sel{border-color:var(--pos);background:var(--pos-bg)}
+.choices .N:hover:not(:disabled),.choices .N.sel{border-color:var(--neg);background:var(--neg-bg)}
+.choices .U:hover:not(:disabled),.choices .U.sel{border-color:var(--neu);background:var(--neu-bg)}
+.choices button:disabled{cursor:default}
+.choices button:disabled:not(.sel){opacity:.45}
+.result{margin-top:28px;display:grid;gap:14px}
+.result .verdict{font-family:var(--f-display);font-size:1.4rem;font-weight:500}
+.who{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:.88rem;color:var(--muted)}
+.who span{display:inline-flex;align-items:center;gap:8px}
+.result p{color:var(--muted);font-size:.97rem;max-width:62ch}
+.rulechip{font-family:var(--f-mono);font-size:.76rem;color:var(--gold-ink);background:var(--hl);padding:1px 7px;border-radius:5px;margin-right:6px}
+.try-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px}
+.btn{border:0;background:var(--ink);color:var(--bg);border-radius:999px;padding:11px 20px;font-weight:600;font-size:.94rem;transition:transform .2s var(--ease)}
+.btn:hover{transform:translateY(-1px)}
+.score{display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:40px;padding-top:22px;border-top:1px solid var(--line);color:var(--muted);font-size:.92rem;align-items:baseline}
+.score b{font-family:var(--f-display);font-weight:500;font-size:1.6rem;color:var(--ink);margin-right:6px}
+.score .reset{margin-left:auto}
+
+/* findings tabs (ported from ui-layouts "Tabs": sliding indicator + directional panel motion) */
+.tabs{position:relative;display:flex;gap:2px;margin-top:clamp(40px,5vw,56px);padding:4px;background:var(--soft);border-radius:999px;width:max-content;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{position:relative;z-index:1;border:0;background:transparent;padding:8px 16px;border-radius:999px;font-size:.9rem;color:var(--muted);white-space:nowrap;transition:color .25s}
+.tabs button[aria-selected="true"]{color:var(--ink);font-weight:600}
+.tab-ind{position:absolute;z-index:0;top:4px;bottom:4px;left:0;width:0;border-radius:999px;background:var(--surface);box-shadow:0 1px 3px rgba(15,27,42,.12)}
+.panels{margin-top:36px}
+.panel{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(28px,5vw,64px);align-items:start}
+.panel .say h3{font-size:clamp(1.5rem,2.6vw,2rem)}
+.panel .say p{color:var(--muted);margin-top:14px;font-size:1rem}
+.panel .say .ctl{margin-top:22px}
+.viz{min-width:0}
+.seg{display:inline-flex;padding:3px;background:var(--soft);border-radius:999px;gap:2px}
+.seg button{border:0;background:transparent;padding:5px 12px;border-radius:999px;font-size:.84rem;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(15,27,42,.1)}
+.key{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.84rem;color:var(--muted);margin-bottom:20px}
+.key span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.sw.P{background:var(--pos)} .sw.U{background:var(--neu)} .sw.N{background:var(--neg)}
+.bgP{background:var(--pos)} .bgU{background:var(--neu)} .bgN{background:var(--neg)}
+
+.split{display:grid;gap:26px}
+.split .nm{display:flex;justify-content:space-between;gap:12px;font-size:.92rem;margin-bottom:8px}
+.split .nm small{color:var(--faint);font-size:.82rem}
+.split .bar{display:flex;gap:3px;height:14px}
+.split .bar div{border-radius:3px;transform-origin:left}
+.split .vals{display:flex;gap:3px;margin-top:6px;font-family:var(--f-mono);font-size:.74rem;color:var(--muted)}
+.split .vals span{overflow:hidden;white-space:nowrap}
+
+.heat{display:grid;grid-template-columns:70px repeat(3,minmax(0,1fr));gap:6px}
+.heat .h{color:var(--faint);font-size:.8rem;text-align:center;padding-bottom:4px}
+.heat .rh{display:flex;align-items:center;justify-content:flex-end;padding-right:8px}
+.heat button{border:0;border-radius:10px;height:50px;font-family:var(--f-mono);font-size:.92rem;background:rgba(var(--heat),var(--a));color:var(--ink);transition:background .35s,transform .2s var(--ease)}
+.heat button.dk{color:var(--bg)}
+.heat button:hover{transform:scale(1.04)}
+
+.aspects{display:grid;gap:12px;position:relative}
+.arow{display:grid;grid-template-columns:150px minmax(0,1fr) 32px;gap:14px;align-items:center;border:0;background:transparent;padding:4px 0;text-align:left;width:100%;border-radius:8px}
+.arow .nm{font-size:.9rem}
+.arow .bars{display:flex;gap:2px;height:10px}
+.arow .bars div{border-radius:2px}
+.arow .t{font-family:var(--f-mono);font-size:.8rem;color:var(--faint);text-align:right}
+.arow:hover .nm{text-decoration:underline;text-decoration-color:var(--gold);text-underline-offset:4px}
+
+.words{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+.words h4{margin:0 0 14px;font-size:.88rem;font-weight:600;display:flex;align-items:center;gap:8px}
+.wrow{display:grid;grid-template-columns:64px minmax(0,1fr) 24px;gap:10px;align-items:center;font-size:.9rem;padding:3px 0}
+.wrow .b{height:8px;border-radius:0 3px 3px 0}
+.wrow .c{font-family:var(--f-mono);font-size:.74rem;color:var(--faint);text-align:right}
+.wrow.flag .w{background:var(--hl);border-radius:3px;padding:0 4px;justify-self:start}
+
+.strip{display:grid;--lab:86px}
+.lane{display:grid;grid-template-columns:var(--lab) minmax(0,1fr)}
+.lane-lab{display:flex;flex-direction:column;justify-content:center;font-size:.9rem;line-height:1.3}
+.lane-lab small{font-family:var(--f-mono);font-size:.7rem;color:var(--faint)}
+.lane-plot{position:relative;height:76px;min-width:0}
+.lane-plot::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line)}
+.dot{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;border:1.5px solid var(--bg);padding:0;background:var(--c);transition:transform .15s}
+.dot:hover,.dot:focus-visible{transform:scale(1.8);z-index:3}
+.dot.P{--c:var(--pos)} .dot.U{--c:var(--neu)} .dot.N{--c:var(--neg)}
+.median{position:absolute;top:10px;bottom:10px;width:2px;margin-left:-1px;background:var(--ink);z-index:2;pointer-events:none}
+.median span{position:absolute;top:-4px;left:6px;font-family:var(--f-mono);font-size:.66rem;color:var(--ink);white-space:nowrap}
+.axis{display:grid;grid-template-columns:var(--lab) minmax(0,1fr);margin-top:6px}
+.axis .ticks{position:relative;height:22px;border-top:1px solid var(--line)}
+.axis .ticks span{position:absolute;top:5px;transform:translateX(-50%);font-family:var(--f-mono);font-size:.7rem;color:var(--faint)}
+.axis-cap{font-size:.8rem;color:var(--faint);text-align:right;margin-top:6px}
+
+.hard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.hard button{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:20px;text-align:left;transition:border-color .2s,transform .2s var(--ease);position:relative;overflow:hidden}
+.hard button::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(220px circle at var(--mx,50%) var(--my,50%),var(--hl),transparent 65%);opacity:0;transition:opacity .3s}
+.hard button:hover{border-color:var(--faint)}
+.hard button:hover::after{opacity:.7}
+.hard b{font-family:var(--f-display);font-weight:500;font-size:2rem;line-height:1;display:block}
+.hard strong{display:block;margin-top:8px;font-size:.98rem}
+.hard q{display:block;margin-top:10px;font-family:var(--f-display);font-style:italic;font-size:.95rem;color:var(--muted)}
+
+/* reviews */
+.finder{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:clamp(36px,5vw,48px)}
+.search{flex:1 1 260px;position:relative}
+.search input{width:100%;font:inherit;font-size:1rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:12px 18px 12px 44px}
+.search svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--faint)}
+.filters2{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;align-items:center}
+.filters2 select{font:inherit;font-size:.88rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 14px}
+.filters2 label.cuek{display:inline-flex;align-items:center;gap:8px;font-size:.88rem;color:var(--muted);margin-left:auto}
+.filters2 input[type=checkbox]{accent-color:var(--gold);width:16px;height:16px}
+.count{color:var(--muted);font-size:.9rem;margin-top:28px}
+.count b{color:var(--ink)}
+.count button{border:0;background:none;color:var(--gold-ink);font-weight:600;font-size:.9rem;padding:0 0 0 8px}
+.list{margin-top:12px}
+.item{border-bottom:1px solid var(--line)}
+.item > button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;width:100%;text-align:left;border:0;background:transparent;padding:18px 0;align-items:start}
+.item .tx{font-size:1rem;line-height:1.55;min-width:0;overflow-wrap:anywhere}
+.item .meta{display:block;margin-top:6px;font-size:.8rem;color:var(--faint)}
+.item .meta .stars{font-size:.78rem}
+.item .info{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:12px 24px;padding:0 0 20px;font-size:.88rem}
+.item .info dt{font-size:.76rem;color:var(--faint)}
+.item .info dd{margin:2px 0 0}
+.item > button:hover .tx{color:var(--ink)}
+.loadmore{display:flex;justify-content:center;margin-top:28px}
+.btn.line{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.empty{color:var(--muted);padding:28px 0}
+
+/* readiness */
+.ready{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(36px,6vw,80px);align-items:start}
+.checks{list-style:none;margin:0;padding:0}
+.checks li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;padding:18px 0;border-bottom:1px solid var(--line)}
+.checks li:first-child{border-top:1px solid var(--line)}
+.checks strong{font-weight:600}
+.checks p{grid-column:1/-1;color:var(--muted);font-size:.93rem}
+.status{display:inline-flex;align-items:center;gap:7px;font-size:.82rem;font-weight:600}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.status.ok{color:var(--ok)} .status.warn{color:var(--warn)} .status.bad{color:var(--bad)}
+.status.warn::before{border-radius:1px;transform:rotate(45deg)}
+.status.bad::before{border-radius:1px}
+
+footer{padding-block:56px 72px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
+.foot{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:32px}
+.foot h4{margin:0 0 10px;color:var(--ink);font-size:.9rem}
+.foot p + p{margin-top:4px}
+
+.tip{position:fixed;z-index:60;pointer-events:none;max-width:300px;background:var(--ink);color:var(--bg);border-radius:10px;padding:9px 12px;font-size:.82rem;line-height:1.45;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s}
+.tip.on{opacity:1;transform:none}
+.tip b{display:block;font-family:var(--f-mono);font-weight:500;font-size:.72rem;opacity:.7;margin-bottom:3px}
+
+@media (max-width:900px){
+  .hero-grid,.agree,.panel,.ready{grid-template-columns:1fr}
+  .steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .defs{grid-template-columns:1fr}
+  .rules{columns:1}
+  .facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .foot{grid-template-columns:1fr}
+  .links{display:none}
+  .theme{margin-left:auto}
+}
+@media (max-width:600px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .words{grid-template-columns:1fr}
+  .hard{grid-template-columns:1fr}
+  .arow{grid-template-columns:104px minmax(0,1fr) 28px}
+  .drow summary{grid-template-columns:minmax(0,1fr) auto 16px}
+  .drow .id{display:none}
+  .drow .body{padding-left:0}
+  .strip,.axis{--lab:70px}
+  .choices{gap:8px}
+  .filters2 label.cuek{margin-left:0}
+}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*{transition:none!important}}
+</style>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="#top"><i aria-hidden="true"></i>Review Annotation</a>
+    <nav class="links" aria-label="Sections">
+      <a href="#process">Process</a><a href="#agreement">Agreement</a><a href="#try">Try it</a><a href="#findings">Findings</a><a href="#reviews">Reviews</a>
+    </nav>
+    <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+  <div class="wrap hero">
+    <div class="hero-grid">
+      <div>
+        <p class="kicker">CCE-2 · Natural Language Processing Lab</p>
+        <h1 id="heroTitle">Three hundred Flipkart reviews, <span class="mark"><em>read twice.</em></span></h1>
+        <p class="intro">We wrote a sentiment guideline, labelled 300 real customer reviews by hand, checked how often two annotators agreed, and found where the dataset's own labels go wrong.</p>
+        <div class="stats">
+          <div class="stat"><b>0.735</b><span>kappa between annotators</span></div>
+          <div class="stat"><b>85%</b><span>agreement on the 60 shared reviews</span></div>
+          <div class="stat"><b>14</b><span>negatives the source called positive</span></div>
+        </div>
+      </div>
+      <figure class="review" id="live" style="margin:0" aria-label="Examples of annotated reviews">
+        <div class="review-top"><span id="lvId"></span><span id="lvStars"></span></div>
+        <p class="quote" id="lvText"></p>
+        <div class="verdicts"><div>Dataset label <span id="lvSrc"></span></div><div>Our label <span id="lvOur"></span></div></div>
+        <p class="why" id="lvWhy"></p>
+        <div class="review-foot">
+          <div class="pips" id="lvPips" aria-label="Choose example"></div>
+          <button class="ghost" id="lvPause" type="button">Pause</button>
+          <button class="ghost" id="lvNext" type="button">Next</button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <section id="process">
+    <div class="wrap">
+      <div class="head">
+        <p class="kicker">How the labels were made</p>
+        <h2>Four steps from a raw scrape to labels we can defend</h2>
+      </div>
+      <div class="steps" id="steps"></div>
+      <details class="more">
+        <summary>The guideline <span>three labels, ten rules</span></summary>
+        <div class="more-body">
+          <div class="defs" id="defs"></div>
+          <ul class="rules" id="rules"></ul>
+        </div>
+      </details>
+      <details class="more">
+        <summary>The dataset <span>Kaggle, December 2022</span></summary>
+        <div class="more-body"><dl class="facts" id="facts"></dl></div>
+      </details>
+    </div>
+  </section>
+
+  <section id="agreement">
+    <div class="wrap">
+      <div class="head">
+        <p class="kicker">Agreement</p>
+        <h2>Two annotators, working apart, agreed on 51 of 60 reviews</h2>
+        <p class="intro">Most reviews are positive, so two people could agree often by luck. Cohen's kappa removes that chance agreement.</p>
+      </div>
+      <div class="agree">
+        <div class="kappa">
+          <b>0.735</b>
+          <p>Substantial agreement on the Landis and Koch scale, and higher than our labels' agreement with either automatic shortcut.</p>
+          <div class="scale" id="scale">
+            <div class="scale-track"></div>
+            <div class="scale-ticks"><span>0</span><span>0.2</span><span>0.4</span><span>0.6</span><span>0.8</span><span>1</span></div>
+          </div>
+          <div class="scale-note"><span class="m">Annotator A vs B</span><span>Ours vs source labels 0.638</span><span>Ours vs star rating 0.641</span></div>
+        </div>
+        <div>
+          <div class="matrix" id="matrix"></div>
+          <p class="matrix-cap">Rows are annotator A's labels, columns annotator B's. Select a cell to read its reviews.</p>
+          <div class="picked" id="picked"></div>
+        </div>
+      </div>
+      <div class="disputes">
+        <h3>The nine disagreements</h3>
+        <p class="intro" style="font-size:1rem">Eight involve Neutral. Each was settled in a review meeting, and three produced new rules.</p>
+        <div id="disputes"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="try">
+    <div class="wrap">
+      <div class="head">
+        <p class="kicker">Try it</p>
+        <h2>Label the twelve hardest reviews yourself</h2>
+        <p class="intro">The nine disputed reviews plus three where the stars contradict the text. Press 1, 2 or 3, or click.</p>
+      </div>
+      <div class="trybox">
+        <div class="progress"><i id="tryBar"></i></div>
+        <div class="try-meta"><span id="tryPos"></span><span id="tryStars"></span></div>
+        <p class="try-text" id="tryText"></p>
+        <div class="choices" id="tryChoices"></div>
+        <div class="result" id="tryResult" hidden></div>
+        <div class="score"><span><b id="tryScore">0/0</b>matched the final label</span><span id="tryKappa"></span><button class="ghost reset" id="tryReset" type="button">Start over</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="findings">
+    <div class="wrap">
+      <div class="head">
+        <p class="kicker">Findings</p>
+        <h2>What the labels show</h2>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Findings" id="tabs">
+        <span class="tab-ind" id="tabInd" aria-hidden="true"></span>
+        <button role="tab" aria-selected="true" aria-controls="p-split" id="t-split">Label split</button>
+        <button role="tab" aria-selected="false" aria-controls="p-stars" id="t-stars">Stars vs text</button>
+        <button role="tab" aria-selected="false" aria-controls="p-aspects" id="t-aspects">Aspects</button>
+        <button role="tab" aria-selected="false" aria-controls="p-words" id="t-words">Words</button>
+        <button role="tab" aria-selected="false" aria-controls="p-length" id="t-length">Length</button>
+        <button role="tab" aria-selected="false" aria-controls="p-hard" id="t-hard">Hard cases</button>
+      </div>
+      <div class="panels">
+        <div class="panel" role="tabpanel" id="p-split" aria-labelledby="t-split">
+          <div class="say"><h3>Shortcuts overcount positive reviews</h3><p>Our reading finds 116 negative reviews. The dataset's lexicon labels find 99, because "not good" still contains "good".</p></div>
+          <div class="viz"><div class="key"><span><i class="sw P"></i>Positive</span><span><i class="sw U"></i>Neutral</span><span><i class="sw N"></i>Negative</span></div><div class="split" id="split"></div></div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-stars" aria-labelledby="t-stars" hidden>
+          <div class="say"><h3>Three stars rarely means neutral</h3><p>Only 12 of 60 three-star reviews read as neutral. At one and five stars, rating and text agree almost every time.</p><div class="ctl"><div class="seg" id="heatMode"><button type="button" aria-pressed="true" data-m="n">Count</button><button type="button" aria-pressed="false" data-m="pct">% of row</button></div></div></div>
+          <div class="viz"><div class="heat" id="heat"></div></div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-aspects" aria-labelledby="t-aspects" hidden>
+          <div class="say"><h3>Durability is where products fail</h3><p>22 of 28 durability mentions are negative, usually a failure within days or months. Value for money is almost always praised.</p><div class="ctl"><div class="seg" id="aspSort"><button type="button" aria-pressed="true" data-m="vol">Most discussed</button><button type="button" aria-pressed="false" data-m="neg">Most negative</button></div></div></div>
+          <div class="viz"><div class="key"><span><i class="sw P"></i>Positive</span><span><i class="sw U"></i>Neutral</span><span><i class="sw N"></i>Negative</span></div><div class="aspects" id="aspects"></div></div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-words" aria-labelledby="t-words" hidden>
+          <div class="say"><h3>"Good" hides in negative reviews</h3><p>It is the second most common word in negative reviews, almost always as "not good". Word counts without negation confuse the two labels.</p></div>
+          <div class="viz"><div class="words" id="words"></div></div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-length" aria-labelledby="t-length" hidden>
+          <div class="say"><h3>Unhappy customers write more</h3><p>Negative reviews average 17.4 words against 15.4 for positive ones, and have the longest tail. Each dot is a review: hover to read it, click to find it in the list.</p></div>
+          <div class="viz"><div class="strip" id="strip"></div></div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-hard" aria-labelledby="t-hard" hidden>
+          <div class="say"><h3>110 reviews need extra care</h3><p>Mixed opinions, Hinglish, typos and sarcasm. These are the reviews automatic models get wrong, so a test set should over-represent them.</p></div>
+          <div class="viz"><div class="hard" id="hard"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="reviews">
+    <div class="wrap">
+      <div class="head">
+        <p class="kicker">Reviews</p>
+        <h2>Every review, with its label</h2>
+      </div>
+      <div class="finder">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <label class="sr" for="q">Search reviews</label>
+          <input type="search" id="q" placeholder="Search words, products or an ID like FK052" autocomplete="off">
+        </div>
+        <div class="seg" id="fs" aria-label="Filter by label"><button type="button" aria-pressed="true" data-v="">All</button><button type="button" aria-pressed="false" data-v="P">Positive</button><button type="button" aria-pressed="false" data-v="U">Neutral</button><button type="button" aria-pressed="false" data-v="N">Negative</button></div>
+      </div>
+      <div class="filters2">
+        <label class="sr" for="fa">Aspect</label><select id="fa"><option value="">All aspects</option></select>
+        <label class="sr" for="fr">Stars</label><select id="fr"><option value="">All ratings</option><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select>
+        <label class="sr" for="ff">Case</label><select id="ff"><option value="">All cases</option><option value="M">Mixed</option><option value="I">Informal or Hinglish</option><option value="A">Ambiguous</option><option value="S">Sarcasm</option><option value="mm">Stars contradict text</option><option value="src">Source label differs</option></select>
+        <label class="cuek"><input type="checkbox" id="cueToggle"> Highlight cue words</label>
+      </div>
+      <p class="count" id="count"></p>
+      <div class="list plain" id="list"></div>
+      <div class="loadmore"><button class="btn line" id="more" type="button">Show more</button></div>
+    </div>
+  </section>
+
+  <section id="ready">
+    <div class="wrap ready">
+      <div class="head">
+        <p class="kicker">Readiness</p>
+        <h2>Ready to test models, thin on Neutral</h2>
+        <p class="intro">Consistent labels on real text make a good evaluation set for sentiment and aspect models. At 300 reviews with 8% Neutral, it is too small and imbalanced to train one from scratch.</p>
+      </div>
+      <ul class="checks" id="checks"></ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div><h4>Flipkart review annotation</h4><p>300 customer reviews labelled for sentiment and aspect, with agreement checks and a readiness assessment for NLP use.</p></div>
+    <div><h4>Data</h4><p><a href="https://www.kaggle.com/datasets/niraliivaghani/flipkart-product-customer-reviews-dataset" target="_blank" rel="noopener">Flipkart Product reviews with sentiment</a>, N. Vaghani, Kaggle (DbCL v1.0).</p><p>Agreement scale: Landis and Koch, 1977.</p></div>
+    <div><h4>Design</h4><p>Colours from <a href="https://sronpersonalpages.nl/~pault/" target="_blank" rel="noopener">Paul Tol's</a> colour-blind-safe schemes. Fraunces, Instrument Sans and Azeret Mono. Motion by anime.js.</p></div>
+  </div>
+</footer>
+
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
+<script>
+const DATA = {"records":[{"id":"FK001","t":"i did not got a demo at all trying to contact the customer care but not helpful totally waste light is not coming in the machine told about that its been two weeks now no one to attend it till today","r":1,"p":6099,"n":"SAMSUNG 23 L Solo Microwave OvenMS23A301TAK Black","h":"unsatisfactory","s":"N","a":"SERV","f":"","d":"N","an":"A","w":41},{"id":"FK002","t":"this is by far so good and i love it its my first apple product and im in loveeeif you plan on purchasing it do it","r":5,"p":29990,"n":"APPLE iPad (9th Gen) 64 GB ROM 10.2 inch with Wi-Fi Only (Space Grey)","h":"great product","s":"P","a":"GEN","f":"I","d":"P","an":"A","w":26},{"id":"FK003","t":"will not recommend at all very poor quality wood even on installing got damaged on adjusting with hand","r":3,"p":3307,"n":"Woodbuzz Engineered Wood Study TableFree Standing Finish Color...","h":"just okay","s":"N","a":"QUAL","f":"","d":"N","an":"A","w":18},{"id":"FK004","t":"wonderful book for upsc cse as well as cgl","r":5,"p":335,"n":"Indian Art And Culture English 1st Edition For UPSC CSE Prelims...","h":"brilliant","s":"P","a":"GEN","f":"","d":"P","an":"A","w":9},{"id":"FK005","t":"good phone in this price thanks","r":4,"p":7499,"n":"POCO C31 (Royal Blue, 64 GB)ÐÒÐÒÐÒÐÒ(4 GB RAM)","h":"delightful","s":"P","a":"VALUE","f":"","d":"P","an":"A","w":6},{"id":"FK006","t":"most of the kits dont have sufficient liquid in the pouch this kits are unusable and vast of money","r":1,"p":125,"n":"Mylab CoviSelf COVID-19 Rapid COVID-19 Rapid Antigen Kit...","h":"unsatisfactory","s":"N","a":"QUAL","f":"","d":"N","an":"A","w":19},{"id":"FK007","t":"satisfied with the product and its timely delivery and installation","r":3,"p":7599,"n":"Eurodomo Hood Indigo PRO HC SC FL BK 60 Auto Clean Wall Mounted...","h":"decent product","s":"P","a":"SERV","f":"","d":"P","an":"A","w":10},{"id":"FK008","t":"working good but quality is bad after one month use some rust on plate this is duplicate product and weightless scoop is missing retail net seller is very bad dont buy prestige online products","r":2,"p":2454,"n":"Prestige PRWO 1.8-2 Electric Rice Cooker with Steaming Feature(1.8...","h":"not good","s":"N","a":"QUAL","f":"M","d":"N","an":"A","w":34},{"id":"FK009","t":"very good product quality worth for money","r":5,"p":1550,"n":"Catvision CSR-401HP WIFI Media Streaming Device(Black)","h":"awesome","s":"P","a":"VALUE","f":"","d":"P","an":"A","w":7},{"id":"FK010","t":"no bag and memory card i dont have enough time to cancel and reorder it","r":3,"p":30999,"n":"Canon EOS 3000D DSLR Camera 1 Camera Body, 18 - 55 mm Lens(Black)","h":"decent product","s":"N","a":"DELIV","f":"","d":"N","an":"A","w":15},{"id":"FK011","t":"nice quality and quick delivery those pants has chain pocket","r":5,"p":319,"n":"Pack of 2 Solid Men Dark Grey, Grey Casual Shorts","h":"","s":"P","a":"QUAL","f":"","d":"P","an":"A","w":10},{"id":"FK012","t":"a very reasonably priced product with good sound quality fm reception is very poor good one for its price if you dont expect much","r":2,"p":899,"n":"Sound Boss SB-2032 BLUETOOTH/USB/SD/AUX/FM/MP3 Car Stereo(Single Din)","h":"sound boss","s":"U","a":"PERF","f":"MA","d":"P","an":"A","w":24},{"id":"FK013","t":"product is not good grinder is going to stop immediately while grinding not worth for money","r":1,"p":3399,"n":"Butterfly Rapid Plus 750 W Mixer Grinder (5 Jars, Ink Blue)","h":"not recommended at all","s":"N","a":"PERF","f":"","d":"N","an":"A","w":16},{"id":"FK014","t":"best for keep kitchen items it can be easily take the weights without any problems and also its saves space and gives nice looks","r":4,"p":625,"n":"CMerchants Multi Organiser BLue4 Book Shelf Metal Open Book...","h":"delightful","s":"P","a":"PERF","f":"","d":"P","an":"A","w":24},{"id":"FK015","t":"very bad product not good effect waste of money","r":1,"p":189,"n":"BALKRISHNA ENTERPRISE Green Tea Sticks Face Shaping Mask Face...","h":"useless product","s":"N","a":"GEN","f":"","d":"N","an":"A","w":9},{"id":"FK016","t":"plastic of jars as well as mixer are of very cheap quality","r":2,"p":2709,"n":"Thomson Kitchen Master Pro MX03 750 W Juicer Mixer Grinder (6 Jars,...","h":"not good","s":"N","a":"QUAL","f":"","d":"N","an":"A","w":12},{"id":"FK017","t":"best seeds ever i have purchased would buy again if it gives good flowers","r":5,"p":194,"n":"Aero Seeds 40 Varieties of Flower Combo Pack Seed2050 per packet","h":"excellent","s":"P","a":"GEN","f":"A","d":"P","an":"A","w":14},{"id":"FK018","t":"sound quality is goodbtu wall mount is very bad","r":5,"p":5499,"n":"MOTOROLA AmphisoundX Atom with HDMI Arc 120 W Bluetooth...","h":"super!","s":"U","a":"PERF","f":"M","d":"N","an":"A","w":9},{"id":"FK019","t":"screen cast was very worst if we play any movie or video while using casting video will paused or disconnected too much irritating","r":1,"p":3999,"n":"realme 4k Smart Google TV Stick (Black)(Black)","h":"terrible product","s":"N","a":"PERF","f":"","d":"N","an":"A","w":23},{"id":"FK020","t":"okay okay this product not a good","r":3,"p":599,"n":"Boys & Girls Full Sleeve Printed Sweatshirt","h":"","s":"N","a":"GEN","f":"I","d":"U","an":"A","w":7},{"id":"FK021","t":"cooler is jabardast but not honeycomb pad","r":4,"p":7999,"n":"MAHARAJA WHITELINE 65 L Desert Air Cooler(White, Grey, Rambo Grey /...","h":"really nice","s":"P","a":"PERF","f":"MI","d":"U","an":"A","w":7},{"id":"FK022","t":"plastic quality is average otherwise its good","r":4,"p":4396,"n":"Butterfly Rhino 2 Ltr Wet GrinderÐÒÐÒÐÒÐÒ(Cherry Red)","h":"worth the money","s":"P","a":"QUAL","f":"M","d":"P","an":"A","w":7},{"id":"FK023","t":"ok not a bad but pipe extreme level to small","r":3,"p":544,"n":"AnshiEnterises FLEXIBLE YELLOW HOSE PIPE INCH 12 mm With Water...","h":"fair","s":"U","a":"SIZE","f":"MI","d":"U","an":"A","w":10},{"id":"FK024","t":"dont by the product very low quality","r":1,"p":299,"n":"Exclusive Range of Stylish Comfortable Sports Sneakers Running...","h":"","s":"N","a":"QUAL","f":"","d":"N","an":"A","w":7},{"id":"FK025","t":"nice product dietician pooja was assigned to me very knowledgeable undestranding her communication skills are excellent very professional lucky to have a good and knowledgeable dietician like her thanks cultsports","r":5,"p":6949,"n":"Urban Terrain Berlin with Complete Accessories & Mobile Tracking...","h":"mind-blowing purchase","s":"P","a":"SERV","f":"","d":"P","an":"A","w":30},{"id":"FK026","t":"the quality of the product is very bad the stitches came off after 10 daysthe product is not stitched properly","r":1,"p":280,"n":"Men Formal, Casual Blue Artificial Leather Wallet - Regular Size(8...","h":"","s":"N","a":"DUR","f":"","d":"N","an":"A","w":20},{"id":"FK027","t":"not bad this mic is good","r":3,"p":168,"n":"mobspy 3.5mm Clip Microphone For Youtube | Collar Mic for Voice...","h":"decent product","s":"P","a":"GEN","f":"","d":"P","an":"A","w":6},{"id":"FK028","t":"very nice product purchased in 4500 only in offer thanks flipkart i will update review after 01 month using","r":4,"p":6498,"n":"PHILIPS HR183200 500 W Juicer 1 Jar Ink Black","h":"pretty good","s":"P","a":"VALUE","f":"","d":"P","an":"A","w":19},{"id":"FK029","t":"third class producti have a 30mbps broadband plan sometimes it gives only 3 or 4 mbpsi have no issue with internet service providerand i will check other router my internet work properly","r":5,"p":1565,"n":"Mi 4A Wireless MU-MIMO Gigabit 1200 Mbps...","h":"brilliant","s":"N","a":"PERF","f":"","d":"N","an":"A","w":32},{"id":"FK030","t":"product is good and gets heated little bit but its best at this range","r":4,"p":1599,"n":"AGARO Regal Hand-held Vacuum CleanerÐÒÐÓ®ÐÂ ÐÒÐÓ®ÐÂ (Black)","h":"good quality product","s":"P","a":"VALUE","f":"M","d":"P","an":"A","w":14},{"id":"FK031","t":"bought it for my 3 year old daughter nice product got it 265 10 supercoins","r":4,"p":449,"n":"cello ColourUp Hobby Bag of Assorted Stationery|Crayons, Sketch...","h":"pretty good","s":"P","a":"VALUE","f":"","d":"P","an":"A","w":15},{"id":"FK032","t":"thankyou flipkart for timely delivery and installation its a nice product in this range if we compared with other tv picture quality is very good and we are positive for future support also","r":5,"p":13999,"n":"Mi 5A 80 cm (32 inch) HD Ready LED Smart Android TV with Dolby...","h":"perfect product!","s":"P","a":"PERF","f":"","d":"P","an":"A","w":33},{"id":"FK033","t":"product is good but its too small","r":4,"p":197,"n":"Fashion Deck H Non-electric 2 L Hot Water Bag(Green)","h":"pretty good","s":"U","a":"SIZE","f":"M","d":"P","an":"A","w":7},{"id":"FK034","t":"smell not like expected but overall good","r":3,"p":195,"n":"MANGALAM Camphor Tablet 100g Jar Pack of 1","h":"just okay","s":"P","a":"GEN","f":"M","d":"P","an":"A","w":7},{"id":"FK035","t":"the product is more or less good firstly i have received a damaged product with a broken plate now im satisfied after replacement","r":3,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"good","s":"P","a":"SERV","f":"M","d":"N","an":"A","w":23},{"id":"FK036","t":"this product not working and current shock body shock this product","r":1,"p":2399,"n":"Prestige Atlas Delight Electric Rice Cooker(1.8 L, Blue)","h":"horrible","s":"N","a":"PERF","f":"","d":"N","an":"A","w":11},{"id":"FK037","t":"very nice and easy to handle","r":5,"p":5039,"n":"Inalsa Fiesta Lx 650 W Food Processor(White)","h":"best in the market!","s":"P","a":"PERF","f":"","d":"P","an":"A","w":6},{"id":"FK038","t":"some seeds are not germinated iam waiting for one month not fully satisfied aero company seeds are better germination rate","r":3,"p":152,"n":"Greenery Hub Home Garden Flowers Seeds 40 Varieties Seeds Combo...","h":"nice","s":"N","a":"PERF","f":"M","d":"P","an":"A","w":20},{"id":"FK039","t":"this one is a good card","r":5,"p":649,"n":"SAMSUNG EVO Plus 64 GB MicroSDXC Class 10 95 MBs Memory CardWith...","h":"fabulous!","s":"P","a":"GEN","f":"","d":"P","an":"A","w":6},{"id":"FK040","t":"its a good mid range only issue is that it is quite noisy than normal","r":3,"p":3249,"n":"Prestige Plus Atlas 750 W Juicer Mixer Grinder (4 Jars, Blue, White)","h":"good","s":"P","a":"PERF","f":"M","d":"P","an":"A","w":15},{"id":"FK041","t":"not able to cook the food cooking switch not working","r":1,"p":2454,"n":"Prestige PRWO 1.8-2 Electric Rice Cooker with Steaming Feature(1.8...","h":"absolute rubbish!","s":"N","a":"PERF","f":"","d":"U","an":"A","w":10},{"id":"FK042","t":"quality is not satisfied for this price i am disappointed","r":2,"p":1839,"n":"Men Solid Single Breasted Festive, Party, Wedding Blazer(Black)","h":"","s":"N","a":"VALUE","f":"","d":"N","an":"A","w":10},{"id":"FK043","t":"not comfortable its making red mark on my feet","r":1,"p":519,"n":"Men LPMXT-800 Grey Clogs Sandal","h":"","s":"N","a":"SIZE","f":"","d":"N","an":"A","w":9},{"id":"FK044","t":"paper quality and print reduce drastically than last year","r":4,"p":889,"n":"MTG 35 Years NEET Previous Year Solved Question Papers With NEET...","h":"wonderful","s":"N","a":"QUAL","f":"","d":"U","an":"A","w":9},{"id":"FK045","t":"very good productnice packing and delivery boy very good personthank you flipkart","r":4,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"wonderful","s":"P","a":"DELIV","f":"","d":"P","an":"A","w":12},{"id":"FK046","t":"didnt recieved the product shown in the imagethe product i got is of very cheap quality","r":2,"p":168,"n":"mobspy 3.5mm Clip Microphone For Youtube | Collar Mic for Voice...","h":"could be way better","s":"N","a":"QUAL","f":"","d":"N","an":"A","w":16},{"id":"FK047","t":"this product is useful to everyone and its speed is very fast 100110 but one thing its original size not 15tb","r":4,"p":4449,"n":"WD 1.5 TB Wired External Hard Disk Drive (HDD)(Black)","h":"delightful","s":"P","a":"PERF","f":"M","d":"P","an":"A","w":21},{"id":"FK048","t":"good product but that metireal is lol","r":3,"p":453,"n":"Men Cargos","h":"","s":"U","a":"QUAL","f":"AIS","d":"P","an":"A","w":7},{"id":"FK049","t":"amazing perfume i bought this last week from bella vita luxury and im in love with the product the aroma of this perfume is simple unique and heavenly it is one of the best additions to my fragrance wardrobe","r":5,"p":569,"n":"Bella vita organic OUD PARFUM Intense Perfume For Men & Women with...","h":"terrific","s":"P","a":"GEN","f":"","d":"P","an":"A","w":39},{"id":"FK050","t":"used first day and stitches comes out from band","r":3,"p":109,"n":"VICTORY Professional Wrist Wrap Band , Wrist Strap For Gym and...","h":"good","s":"N","a":"DUR","f":"","d":"P","an":"A","w":9},{"id":"FK051","t":"really nice product it gifted my bestfriend on her birthday she was very happy","r":5,"p":1169,"n":"VH000010A Analog Watch - For Women","h":"","s":"P","a":"GEN","f":"","d":"P","an":"A","w":14},{"id":"FK052","t":"wrost product cooling not goodbuild quality not goodtotaly waste product dont buywaste of money","r":2,"p":9999,"n":"Crompton 75 L Desert Air Cooler(White, Teal, ACGC-DAC751)","h":"moderate","s":"N","a":"PERF","f":"I","d":"P","an":"A","w":14},{"id":"FK053","t":"this product is very useful i used it to clean hair from bed and it worked well also tried cleaning door channels build quality is good","r":5,"p":1599,"n":"AGARO Regal Hand-held Vacuum CleanerÐÒÐÓ®ÐÂ ÐÒÐÓ®ÐÂ (Black)","h":"brilliant","s":"P","a":"PERF","f":"","d":"P","an":"A","w":26},{"id":"FK054","t":"the glass big jar not working","r":1,"p":9990,"n":"USHA FP 3810_ 1000 W Food Processor(Black, Silver)","h":"worst experience ever!","s":"N","a":"PERF","f":"","d":"U","an":"A","w":6},{"id":"FK055","t":"waste of money dint work every thing is audible","r":1,"p":198,"n":"DALUCI Waterproof Swimming Professional Silicone Swim Earplugs for...","h":"don't waste your money","s":"N","a":"PERF","f":"","d":"N","an":"A","w":9},{"id":"FK056","t":"i bought this phone for my mother and shes little uncomfortable with this phone shes saying its bit odd she cannot add pictures to contacts and the camera is not up to mark and having some software issues overall its performance is some what acceptable and we are happy with this product","r":3,"p":7499,"n":"POCO C31 (Royal Blue, 64 GB)ÐÒÐÒÐÒÐÒ(4 GB RAM)","h":"acceptable","s":"U","a":"PERF","f":"MA","d":"P","an":"A","w":52},{"id":"FK057","t":"it take more than 30mins to heat a 15l water otherwise product is ok","r":2,"p":290,"n":"CRAFTIFY High Quality 1500 W Immersion Heater RodWater","h":"slightly disappointed","s":"N","a":"PERF","f":"M","d":"U","an":"A","w":14},{"id":"FK058","t":"after 2 months of use i wasnt able to start on on the the soundbar without when it is on charging mode which is a lot disturbing it isnt starting unless its on charging mode so when i am not on charging it is unable to start pathetic product","r":1,"p":1499,"n":"Mivi Fort S16 Soundbar with 2 full range drivers, Made in India 16...","h":"very poor","s":"N","a":"DUR","f":"","d":"N","an":"A","w":49},{"id":"FK059","t":"product looks good as in the picture but looks cheap from closer lack of finishing and poor quality plastic","r":2,"p":599,"n":"Gojeeva Wooden Hanging Lamp suitable for Living...","h":"not good","s":"N","a":"QUAL","f":"","d":"N","an":"A","w":19},{"id":"FK060","t":"after using 3 months i wrote down thisfire tv stick is working good but problem is that remote control is not working properly","r":3,"p":2999,"n":"realme Smart Tv Stick Media Streaming Device(Black)","h":"nice","s":"U","a":"PERF","f":"M","d":"N","an":"A","w":23},{"id":"FK061","t":"nice productsand delivery boy very goodthanks flipkart","r":5,"p":1550,"n":"Catvision CSR-401HP WIFI Media Streaming Device(Black)","h":"awesome","s":"P","a":"DELIV","f":"","d":"P","an":"A","w":7},{"id":"FK062","t":"everything is fine but the remote is not found with it an cable also","r":2,"p":1499,"n":"I Kall IK22 40 W Bluetooth Home Theatre(Black, 2.1 Channel)","h":"could be way better","s":"N","a":"DELIV","f":"M","d":"P","an":"A","w":14},{"id":"FK063","t":"only suitable for rooms onlypoor distance quality","r":1,"p":1565,"n":"Mi 4A Wireless MU-MIMO Gigabit 1200 Mbps...","h":"waste of money!","s":"N","a":"PERF","f":"","d":"N","an":"A","w":7},{"id":"FK064","t":"quality issues after 2nd day use its threats are coming out","r":2,"p":194,"n":"Men Women Striped Ankle LengthPack of 7","h":"not specified","s":"N","a":"DUR","f":"","d":"N","an":"A","w":11},{"id":"FK065","t":"awesome sound clarity but less bass more troublestero speaker good","r":4,"p":1349,"n":"ZEBRONICS Zeb-Vita Plus 16 W Bluetooth Laptop/Desktop...","h":"good choice","s":"P","a":"PERF","f":"M","d":"P","an":"A","w":10},{"id":"FK066","t":"about diet session was very good and gave some tips by dietitian was very helpful to control my weight","r":1,"p":5499,"n":"Urban Terrain Rio with Complete Accessories & Mobile Tracking App...","h":"terrible product","s":"P","a":"SERV","f":"","d":"N","an":"A","w":19},{"id":"FK067","t":"otg not supportedfront camera should be betterperformance should be more fast","r":3,"p":27999,"n":"realme Pad X 6 GB RAM 128 GB ROM 11 inch with Wi-Fi Tablet (Glacier...","h":"nice","s":"N","a":"PERF","f":"","d":"U","an":"A","w":11},{"id":"FK068","t":"excellent built quality outstanding heat defrost20 kg weight of microwave samsung has 12kg only built quality is so average","r":4,"p":5990,"n":"LG 20 L Solo Microwave OvenMS2043DB Black","h":"good quality product","s":"U","a":"QUAL","f":"MA","d":"P","an":"A","w":19},{"id":"FK069","t":"nice cycle as expected just go for itcolour coating should little better","r":4,"p":6499,"n":"LEADER TORFIN 26T MTB Bicycle without Gear Single Speed with FS DD...","h":"delightful","s":"P","a":"GEN","f":"M","d":"P","an":"A","w":12},{"id":"FK070","t":"good tv at this price rangepicture quality is decent","r":4,"p":7999,"n":"Thomson Alpha 80 cm (32 inch) HD Ready LED Smart Linux TV with 30 W...","h":"good quality product","s":"P","a":"VALUE","f":"","d":"P","an":"A","w":9},{"id":"FK071","t":"power button and inner bulb doesnt work very bad product i have requested to return it but they are not picking it up very disappointed","r":1,"p":3499,"n":"MarQ by Flipkart 33-Litre 33AOTMQB Oven Toaster Grill (OTG) with 4...","h":"waste of money!","s":"N","a":"PERF","f":"","d":"N","an":"A","w":25},{"id":"FK072","t":"this is not working some time button up coming and rice not cooking","r":2,"p":1499,"n":"Flipkart SmartBuy CFXB15 Electric Rice Cooker(1.5 L, White)","h":"bad quality","s":"N","a":"PERF","f":"","d":"N","an":"A","w":13},{"id":"FK073","t":"thank u flipcart for quick delivery","r":4,"p":7999,"n":"MAHARAJA WHITELINE 65 L Desert Air Cooler(White, Grey, Rambo Grey /...","h":"good quality product","s":"P","a":"DELIV","f":"","d":"P","an":"A","w":6},{"id":"FK074","t":"good product but small in size","r":3,"p":199,"n":"SHF Cotton Floor MatMulticolor Medium Pack of 5","h":"does the job","s":"U","a":"SIZE","f":"MA","d":"P","an":"A","w":6},{"id":"FK075","t":"highly recommend vgood machine its working exalent","r":5,"p":8499,"n":"Singer FM 1409 Electric Sewing MachineÐÒÐÓ®ÐÂ ÐÒÐÓ®ÐÂ (...","h":"classy product","s":"P","a":"PERF","f":"I","d":"P","an":"A","w":7},{"id":"FK076","t":"it is nice but you cannot do any skill with thisthe tyres are very broad","r":2,"p":989,"n":"Adrenex by Flipkart Big Bang 6 inch x 26.5 inch...","h":"moderate","s":"U","a":"PERF","f":"M","d":"P","an":"A","w":15},{"id":"FK077","t":"looks wise its awesome i got it at the price of 3999 nd i think its the best option the dietician named pooja is very reassuring nd appreciating really loved her service","r":5,"p":5499,"n":"Urban Terrain Rio with Complete Accessories & Mobile Tracking App...","h":"highly recommended","s":"P","a":"SERV","f":"","d":"P","an":"A","w":32},{"id":"FK078","t":"good led in this price range go for it","r":4,"p":13999,"n":"Mi 5A 80 cm (32 inch) HD Ready LED Smart Android TV with Dolby...","h":"pretty good","s":"P","a":"VALUE","f":"","d":"P","an":"A","w":9},{"id":"FK079","t":"great fridge for 56 family member equipment is very good","r":5,"p":24490,"n":"SAMSUNG 253 L Frost Free Double Door 3 Star RefrigeratorÐÒÐÓ®ÐÂ...","h":"simply awesome","s":"P","a":"PERF","f":"","d":"P","an":"A","w":10},{"id":"FK080","t":"the measurement is wrong the top and bottom shelf heights are 8 inches only i had to alter to suit it","r":2,"p":8890,"n":"Home Full Bliss Engineered Wood TV Entertainment UnitFinish Color...","h":"not good","s":"N","a":"SIZE","f":"","d":"P","an":"A","w":21},{"id":"FK081","t":"pant is fit and thanks for flipkart","r":5,"p":409,"n":"Men Regular Fit Black Cotton Blend Trousers","h":"not specified","s":"P","a":"SIZE","f":"","d":"P","an":"A","w":7},{"id":"FK082","t":"very good products but bluetooth is not available in this product","r":4,"p":7999,"n":"Thomson Alpha 80 cm (32 inch) HD Ready LED Smart Linux TV with 30 W...","h":"worth the money","s":"P","a":"PERF","f":"M","d":"P","an":"A","w":11},{"id":"FK083","t":"this hair oil improves our hair health rich in anti oxidants this oil is suitable for both men and women provides strength to hair it has nice odour","r":5,"p":113,"n":"HAIR & CARE Triple Blend Damage Repair Non-Sticky Hair Oil with...","h":"just wow!","s":"P","a":"QUAL","f":"","d":"P","an":"A","w":28},{"id":"FK084","t":"first time i get a defective product that hook clip was damaged then i send return request and they send me new one and its working well and never damage anymore its length about 2 meters something and voice is clear loud with this device over all good device and good response","r":4,"p":170,"n":"Shopfloor.XYZ 3.5mm Clip Microphone For Youtube, Collar Mike For...","h":"really nice","s":"P","a":"SERV","f":"M","d":"P","an":"A","w":52},{"id":"FK085","t":"cutting plants nicely for only small plant s in garden use","r":3,"p":242,"n":"Kraft Seeds 7KB395XY Garden Shear Cutter for multi purpose use with...","h":"nice","s":"P","a":"PERF","f":"","d":"P","an":"A","w":11},{"id":"FK086","t":"i is not best quality and not perfect work it local","r":1,"p":256,"n":"FULL BLACK FANCY DIAL SPORT PU BELT WATCH KING BRECELET PACK OF 3...","h":"not specified","s":"N","a":"QUAL","f":"I","d":"N","an":"A","w":11},{"id":"FK087","t":"i was a little skeptical to use this product from xiomi however based on other reviews i bought itit was a wise decisionfeatures are awesome managing this machine from your app is just so handyyou get real pm25 levels really feel like breathing fresh and puregood one happy customer i am","r":5,"p":8790,"n":"Mi ACM2AA Portable Room Air PurifierWhite","h":"worth the price -super product!!","s":"P","a":"PERF","f":"","d":"P","an":"A","w":51},{"id":"FK088","t":"jars are smaller than other jarsquality is lesser than other mixers","r":3,"p":2995,"n":"Pigeon Glory 550 W Mixer Grinder Multicolor 3 Jars with IB 3 Ltr...","h":"fair","s":"N","a":"QUAL","f":"","d":"U","an":"A","w":11},{"id":"FK089","t":"good quality but the leg column needs to be filled","r":3,"p":513,"n":"Nilkamal Plastic ChairFinish Color PINK Preassembled","h":"does the job","s":"P","a":"QUAL","f":"M","d":"P","an":"A","w":10},{"id":"FK090","t":"using for 02 weeks very good results so far thanks flipkart","r":5,"p":25990,"n":"Midea TORRINO,WQP12-5201F Free Standing 13 Place Settings Intensive...","h":"fabulous!","s":"P","a":"PERF","f":"","d":"P","an":"A","w":11},{"id":"FK091","t":"very nice product but very hard those who are strong they can play with this ball i highly recommend people to buy this product but those who are strong","r":5,"p":429,"n":"NIVIA Storm Football - Size: 5ÐÓ®ÐÂ ÐÓ®ÐÂ (Pack of 1, Multicolor)","h":"super!","s":"P","a":"QUAL","f":"MA","d":"U","an":"A","w":29},{"id":"FK092","t":"i bought this product for my son i liked both the shirt pants the quality is also good","r":5,"p":219,"n":"Baby Boys Baby Girls Casual Tshirt ShortsYellow","h":"not specified","s":"P","a":"QUAL","f":"","d":"P","an":"A","w":18},{"id":"FK093","t":"bowl is small but i satisfied","r":3,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"good","s":"P","a":"SIZE","f":"M","d":"P","an":"A","w":6},{"id":"FK094","t":"i am very very happy to receive my product in cheap cost","r":5,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"mind-blowing purchase","s":"P","a":"VALUE","f":"","d":"P","an":"A","w":12},{"id":"FK095","t":"bro does it have a yellowish screen","r":2,"p":7499,"n":"POCO C31 (Royal Blue, 64 GB)ÐÒÐÒÐÒÐÒ(4 GB RAM)","h":"not good","s":"U","a":"GEN","f":"AI","d":"N","an":"A","w":7},{"id":"FK096","t":"the manual given is not useful and the parts are not properly marked one of the pieces did not have any holes to fix buy only if you have time and patience to understand and assemble it yourself possible that it might break while fixing as the material is not sturdy and the fixing requires some gymnastic abilities","r":2,"p":3307,"n":"Woodbuzz Engineered Wood Study TableFree Standing Finish Color...","h":"not diy, buy at your own discretion","s":"N","a":"QUAL","f":"","d":"N","an":"A","w":58},{"id":"FK097","t":"very bad product i am not happy with your product","r":2,"p":1149,"n":"Mi 3i 10000 mAh Power Bank (Fast Charging, 18W)ÐÒÐÓ®ÐÂ...","h":"not good","s":"N","a":"GEN","f":"","d":"N","an":"A","w":10},{"id":"FK098","t":"very thinand can not be used in floor","r":3,"p":389,"n":"Flipkart SmartBuy Blue Cotton Carpet136 cm X 180 cm Rectangle","h":"nice","s":"N","a":"QUAL","f":"","d":"U","an":"A","w":8},{"id":"FK099","t":"watch looks good in new condition when i used it only one month there is lots of scratch in strap even i always keep it safe from scratch you cant save it from scratch ehen the quality is not good my previous watch also from timex that was a very good quality","r":2,"p":649,"n":"TW0TG7304 Analog Watch For Men","h":"not specified","s":"N","a":"DUR","f":"","d":"P","an":"A","w":52},{"id":"FK100","t":"very good product for daily use","r":4,"p":349,"n":"Dettol Effective Protection Antiseptic LiquidÐÓ®ÐÂ ÐÓ®ÐÂ (1000 ml)","h":"pretty good","s":"P","a":"PERF","f":"","d":"P","an":"A","w":6},{"id":"FK101","t":"shoe is goodbut soal is not good","r":3,"p":799,"n":"Fashion Tree TW12 Steel Toe Genuine Leather Safety Shoe(Black, SB)","h":"good","s":"U","a":"QUAL","f":"M","d":"N","an":"A","w":7},{"id":"FK102","t":"nice productpackaging and ur service awesome","r":5,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"classy product","s":"P","a":"DELIV","f":"","d":"P","an":"A","w":6},{"id":"FK103","t":"this product worked only five months after that waste of money","r":2,"p":405,"n":"Flipkart SmartBuy ISI Mark ShockProof WaterProof 1500 W Immersion...","h":"moderate","s":"N","a":"DUR","f":"","d":"N","an":"A","w":11},{"id":"FK104","t":"the delivery boy is very good","r":4,"p":189,"n":"ScotchBrite Sponge WipeLarge Pack of 3","h":"delightful","s":"P","a":"DELIV","f":"","d":"P","an":"A","w":6},{"id":"FK105","t":"quality is bad sole quality is poor","r":2,"p":519,"n":"Men LPMXT-800 Grey Clogs Sandal","h":"","s":"N","a":"QUAL","f":"","d":"N","an":"A","w":7},{"id":"FK106","t":"very helpful to keep clean thank u perfect home flipkart for dis super product i am so happy worth to money one can buy dis","r":4,"p":1599,"n":"Flipkart Perfect Homes Studio Metal Open Book ShelfFinish Color...","h":"good choice","s":"P","a":"VALUE","f":"I","d":"P","an":"A","w":25},{"id":"FK107","t":"no back support for kids kids fall as they sit on this sofa","r":1,"p":474,"n":"Pearl World Soft Plush Cushion Baby Sofa Seat or Rocking Chair for...","h":"not recommended at all","s":"N","a":"QUAL","f":"","d":"P","an":"A","w":13},{"id":"FK108","t":"very good product at this price running smoothly without any issue","r":4,"p":12990,"n":"Haier 6.5 kg 5 star Ariel Wash Fully Automatic Top Load Brown,...","h":"wonderful","s":"P","a":"VALUE","f":"","d":"P","an":"A","w":11},{"id":"FK109","t":"guys dont buy this item within 10 day got broken and dont have warranty policy","r":1,"p":1260,"n":"UPC Upgraded Hands Free Squeeze Microfiber Flat Spin Mop 360...","h":"horrible","s":"N","a":"DUR","f":"","d":"N","an":"A","w":15},{"id":"FK110","t":"good product and service quality was nice delivery timings within one day installation also superb","r":5,"p":24490,"n":"SAMSUNG 253 L Frost Free Double Door 3 Star RefrigeratorÐÒÐÓ®ÐÂ...","h":"just wow!","s":"P","a":"SERV","f":"","d":"P","an":"A","w":15},{"id":"FK111","t":"no doubt the product is superb u can trust milton products blindly","r":5,"p":699,"n":"Pigeon Favourite Electric Kettle(1.5 L, Silver, Black)","h":"wonderful","s":"P","a":"QUAL","f":"","d":"P","an":"A","w":12},{"id":"FK112","t":"dont buy anybody very cheap paking and not fit in watch","r":1,"p":329,"n":"ICECLOUD Smart Watch 2 Pins Magnetic Suction Charger Cable...","h":"did not meet expectations","s":"N","a":"SIZE","f":"","d":"N","an":"A","w":11},{"id":"FK113","t":"purifier seems good but installation not much satisfying coz installation guys not even check water tds level they just open and fixing in wall they not ready to answer any questions","r":4,"p":14299,"n":"KENT Ace 8 L RO UV UF TDS Water Purifier with Mineral ROTM...","h":"nice product","s":"U","a":"SERV","f":"M","d":"N","an":"A","w":31},{"id":"FK114","t":"original charger for infinix hot8 and all infinix mobile support thank you flipkart and only 2hrs charge 86percent88 completely","r":3,"p":449,"n":"Infinix 10W Quick Charger combo for Infinx devices (MicroUSB -...","h":"does the job","s":"P","a":"PERF","f":"","d":"P","an":"A","w":19},{"id":"FK115","t":"it is ok not good qulity","r":3,"p":1599,"n":"AGARO Regal Hand-held Vacuum CleanerÐÒÐÓ®ÐÂ ÐÒÐÓ®ÐÂ (Black)","h":"decent product","s":"N","a":"QUAL","f":"A","d":"N","an":"A","w":6},{"id":"FK116","t":"battery life bad but overall nice product","r":3,"p":369,"n":"Mayne Flying Remote Control RC Induction Type 2-in-1 Indoor Outdoor...","h":"fair","s":"P","a":"PERF","f":"M","d":"N","an":"A","w":7},{"id":"FK117","t":"i got this in very affordable price from flipkart and i like this design and looks also nice one","r":4,"p":1169,"n":"VH000010A Analog Watch - For Women","h":"","s":"P","a":"VALUE","f":"","d":"P","an":"A","w":19},{"id":"FK118","t":"poor quality it works 12day properly dont buy waste of money dont buy it singer is not a good quality product there is no demo and installation of it","r":1,"p":8499,"n":"Singer FM 1409 Electric Sewing MachineÐÒÐÓ®ÐÂ ÐÒÐÓ®ÐÂ (...","h":"don't waste your money","s":"N","a":"DUR","f":"","d":"N","an":"A","w":29},{"id":"FK119","t":"good quality product and thanks to flipkart","r":4,"p":171,"n":"Tanunni Mobile Holder Mobile Holder","h":"delightful","s":"P","a":"QUAL","f":"","d":"P","an":"A","w":7},{"id":"FK120","t":"very nice product i m happy to buying this amazing product really i love itthank you so much flip cart","r":5,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"terrific purchase","s":"P","a":"GEN","f":"","d":"P","an":"A","w":20},{"id":"FK121","t":"good quality sound and better battery backup worth for money","r":5,"p":3499,"n":"Google Nest Mini (2nd Gen) with Google Assistant Smart Speaker(Chalk)","h":"just wow!","s":"P","a":"PERF","f":"","d":"P","an":"AB","w":10},{"id":"FK122","t":"good quality according to rate base","r":5,"p":1199,"n":"boAt Rockerz 510 Super Extra Bass Bluetooth Headset(Molten Orange,...","h":"just wow!","s":"P","a":"VALUE","f":"","d":"P","an":"AB","w":6},{"id":"FK123","t":"awesome purchasepros best sound quality and bass good battery backupcons if you wear 4050 minute continious then you will feel pain in ear head cusion is not good as ear one","r":4,"p":1199,"n":"boAt Rockerz 510 Super Extra Bass Bluetooth Headset(Molten Orange,...","h":"wonderful","s":"P","a":"PERF","f":"M","d":"P","an":"AB","w":31},{"id":"FK124","t":"the size is small but good product at this price","r":5,"p":199,"n":"Dinine Craft Set of 4 Showpiece for Home Decor Handicraft Showpiece...","h":"excellent","s":"P","a":"VALUE","f":"M","d":"P","an":"AB","w":10},{"id":"FK125","t":"material is waste does not fit for any use waste of moneywaste of money","r":1,"p":625,"n":"CMerchants Multi Organiser BLue4 Book Shelf Metal Open Book...","h":"worst experience ever!","s":"N","a":"QUAL","f":"","d":"N","an":"AB","w":14},{"id":"FK126","t":"strong and hardy product can bear a lot of weights big thumbs up to the manufacturer definitely go for it writing this review after using the product for 2 months","r":5,"p":625,"n":"CMerchants Multi Organiser BLue4 Book Shelf Metal Open Book...","h":"best in the market!","s":"P","a":"DUR","f":"","d":"P","an":"AB","w":30},{"id":"FK127","t":"good good ok ok better than sandisk sd card reading speed 120 but you we will not come adaptor","r":2,"p":649,"n":"SAMSUNG EVO Plus 64 GB MicroSDXC Class 10 95 MBs Memory CardWith...","h":"not good","s":"U","a":"PERF","f":"AI","d":"P","an":"AB","w":19},{"id":"FK128","t":"slow function ok baki all ok","r":3,"p":7299,"n":"LUMINOUS ZELIO 110012V Ecomm Pure Sine Wave Inverter","h":"does the job","s":"U","a":"PERF","f":"I","d":"P","an":"AB","w":6},{"id":"FK129","t":"usb c port is only for input chargingno output from usb c portnow many phones come with type c to type c data cable which we cant use here","r":1,"p":1149,"n":"Mi 3i 10000 mAh Power Bank (Fast Charging, 18W)ÐÒÐÓ®ÐÂ...","h":"hated it!","s":"N","a":"PERF","f":"","d":"N","an":"AB","w":29},{"id":"FK130","t":"pin become hot after sometimeotherwise goodfast heating reviw after one monthstop heatingits gonewaste of money","r":2,"p":290,"n":"RedShell High Quality 2000 W Shock Proof Immersion Heater RodWater","h":"bad quality","s":"N","a":"DUR","f":"M","d":"N","an":"AB","w":15},{"id":"FK131","t":"i am using google home hub since very long time but this time i bought nest mini its superb and very compact so i can carry it anywhere and enjoing it","r":5,"p":3499,"n":"Google Nest Mini (2nd Gen) with Google Assistant Smart Speaker(Chalk)","h":"perfect product!","s":"P","a":"PERF","f":"","d":"P","an":"AB","w":31},{"id":"FK132","t":"working soo fine sound quality good easy to carry battery backup also goodmostly power consumption very low but one think home theater and sound bar both are not equal sooo different tooo farak","r":5,"p":1499,"n":"Mivi Fort S16 Soundbar with 2 full range drivers, Made in India 16...","h":"fabulous!","s":"P","a":"PERF","f":"MI","d":"P","an":"AB","w":33},{"id":"FK133","t":"its okay product too noisy and its producing high humidityneed ventilation if we keep at window then it works otherwise room will be occupied by humidity","r":3,"p":9999,"n":"Crompton 75 L Desert Air Cooler(White, Teal, ACGC-DAC751)","h":"nice","s":"N","a":"PERF","f":"M","d":"P","an":"AB","w":26},{"id":"FK134","t":"suber sond and not a jbl bass but qualities is good","r":5,"p":1199,"n":"JXL 3way 6 inch Car Speaker 1690 Coaxial Car Speaker(600 W)","h":"awesome","s":"P","a":"PERF","f":"I","d":"P","an":"AB","w":11},{"id":"FK135","t":"super hit most lovelytwinkle twinkle little starthis is super star","r":5,"p":421,"n":"Ang Refill kit Compatible Dye ink for HP cartridge 805, 803, 680,...","h":"super!","s":"P","a":"GEN","f":"I","d":"P","an":"AB","w":10},{"id":"FK136","t":"it was basic they were promoting as aquagaurd brand but its like abidas instead of adidas poma for puma the brand is skyland no warranty every visitation will cost you 500 and trust after 6 months of usage you need technician for every 2 mnths","r":1,"p":4687,"n":"Aquagrand SkyLand 18 Ltr RO UV UF TDS Water Purifier 18 L RO UV UF...","h":"not recommended at all","s":"N","a":"SERV","f":"SI","d":"N","an":"AB","w":45},{"id":"FK137","t":"it is a well and good product i got it with an android tv the only thing which is quite clumsy is that it have to be connected to the same wifi if you need it to operate it using your phone","r":4,"p":3499,"n":"Google Nest Mini (2nd Gen) with Google Assistant Smart Speaker(Chalk)","h":"simply ordinary","s":"P","a":"PERF","f":"M","d":"P","an":"AB","w":42},{"id":"FK138","t":"very perfect product for studying purpose","r":5,"p":555,"n":"NGI STORE Multipurpose laptop table Wood Portable Laptop...","h":"terrific","s":"P","a":"GEN","f":"","d":"P","an":"AB","w":6},{"id":"FK139","t":"its an awesome product with good quality enjoyed it very nice","r":4,"p":899,"n":"D-Link DIR-615 Wireless N 300 RouterÐÒÐÒÐÒÐÒ(Black, Single...","h":"prithvi","s":"P","a":"QUAL","f":"","d":"P","an":"AB","w":11},{"id":"FK140","t":"all threads are coming out from the stitching highly disappointed","r":1,"p":449,"n":"LA VERNE Microfibre Stripes Cushion Pack of 5White","h":"worthless","s":"N","a":"DUR","f":"","d":"N","an":"AB","w":10},{"id":"FK141","t":"basic home theatre very good product compare to other brands like boat and zebranics","r":3,"p":5499,"n":"MOTOROLA AmphisoundX Atom with HDMI Arc 120 W Bluetooth...","h":"just okay","s":"P","a":"PERF","f":"A","d":"P","an":"AB","w":14},{"id":"FK142","t":"sound is awesome and bass also high only thing is connectivity it not syncing with tv everytime i turned off and on it is not connecting automatically even if it in hdmi mode rest everything is superb you can fit it to wall as it is heavy in weight","r":3,"p":4999,"n":"Mivi Fort S100 with 2 in-built subwoofers, Made in India 100 W...","h":"decent product","s":"P","a":"PERF","f":"M","d":"P","an":"AB","w":49},{"id":"FK143","t":"packing experience is very bad and no box for damage protection","r":3,"p":699,"n":"Pigeon Favourite Electric Kettle(1.5 L, Silver, Black)","h":"good","s":"N","a":"DELIV","f":"","d":"N","an":"AB","w":11},{"id":"FK144","t":"good for the price so complaints","r":5,"p":395,"n":"Pack of 3 Solid Men Multicolor Bermuda Shorts","h":"","s":"P","a":"VALUE","f":"AI","d":"U","an":"AB","w":6},{"id":"FK145","t":"not working in only 1 month not going to buy any mivi products worst sound quality worst battery backup and not turning on damaged in 1 month","r":1,"p":1999,"n":"Mivi Fort S24 Soundbar with FM Mode and 2 full range drivers, Made...","h":"worthless","s":"N","a":"DUR","f":"","d":"N","an":"AB","w":27},{"id":"FK146","t":"very nice and looks good i liked it","r":5,"p":399,"n":"Tomex Grey Plastic Broom Holder5 Holders","h":"awesome","s":"P","a":"GEN","f":"","d":"P","an":"AB","w":8},{"id":"FK147","t":"the mivi bar is stunning loving it worth the price the quality of sound is great i am in love with this fantastic product thanks mivi","r":5,"p":4999,"n":"Mivi Fort S100 with 2 in-built subwoofers, Made in India 100 W...","h":"worth every penny","s":"P","a":"PERF","f":"","d":"P","an":"AB","w":26},{"id":"FK148","t":"it broked when the food is in on itnot one plate all onewithout reason totally wast of money","r":2,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"slightly disappointed","s":"N","a":"DUR","f":"","d":"N","an":"AB","w":18},{"id":"FK149","t":"product is good but packaging is not gooddelivery men good","r":4,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"really nice","s":"P","a":"DELIV","f":"M","d":"P","an":"AB","w":10},{"id":"FK150","t":"nice sd card i like it","r":4,"p":649,"n":"SAMSUNG EVO Plus 64 GB MicroSDXC Class 10 95 MBs Memory CardWith...","h":"good choice","s":"P","a":"GEN","f":"","d":"P","an":"AB","w":6},{"id":"FK151","t":"i think this is the best tv at this price","r":5,"p":7999,"n":"Thomson Alpha 80 cm (32 inch) HD Ready LED Smart Linux TV with 30 W...","h":"highly recommended","s":"P","a":"VALUE","f":"","d":"P","an":"AB","w":10},{"id":"FK152","t":"nice speaker with excellent design and sound quality is amazing","r":5,"p":1349,"n":"ZEBRONICS Zeb-Vita Plus 16 W Bluetooth Laptop/Desktop...","h":"excellent","s":"P","a":"PERF","f":"","d":"P","an":"AB","w":10},{"id":"FK153","t":"fabric is not good after washing","r":2,"p":409,"n":"Men Regular Fit Black Cotton Blend Trousers","h":"not specified","s":"N","a":"DUR","f":"","d":"N","an":"AB","w":6},{"id":"FK154","t":"design of tap worst every time you try to openclose the tap water spills 15service not good unacceptablepatheticno proper channelscustomer care does not workeven if it works and service request loggedfor name sake no one will contact you 05price this is the only positive aspect 35these ratings are based on 3 months of using the product","r":2,"p":8199,"n":"LIVPURE LIV-PEP-PRO-PLUS 7 L RO UV UF Water Purifier with Taste...","h":"not good","s":"N","a":"SERV","f":"","d":"N","an":"AB","w":56},{"id":"FK155","t":"foot touching to the front wheel overall looks ok","r":2,"p":16499,"n":"HRX XTRM MTB 900 Foldable 27.5 T Mountain CycleÐÓ®ÐÂ ÐÓ®ÐÂ (21...","h":"bad quality","s":"N","a":"SIZE","f":"M","d":"N","an":"AB","w":9},{"id":"FK156","t":"really amazing i didnt notice that it was packed in a small package but really beautiful and lovely made my day money is lit high i guess but product is really good love to have it","r":5,"p":190,"n":"Copper String LED light 10 MTR 100 LED USB Operated Decorative...","h":"highly recommended","s":"P","a":"QUAL","f":"M","d":"P","an":"AB","w":36},{"id":"FK157","t":"out of 2 only 1 kit has proper things inside the bag and the other kit was totally wastedlost my money on 1 packet","r":3,"p":125,"n":"Mylab CoviSelf COVID-19 Rapid COVID-19 Rapid Antigen Kit...","h":"fair","s":"N","a":"QUAL","f":"","d":"U","an":"AB","w":24},{"id":"FK158","t":"product is good enough and doing its job but be careful while using follow full safety precautions","r":4,"p":405,"n":"Flipkart SmartBuy ISI Mark ShockProof WaterProof 1500 W Immersion...","h":"pretty good","s":"P","a":"PERF","f":"","d":"P","an":"AB","w":17},{"id":"FK159","t":"not satisfied due very light not stich little hard cloths","r":3,"p":8499,"n":"Singer FM 1409 Electric Sewing MachineÐÒÐÓ®ÐÂ ÐÒÐÓ®ÐÂ (...","h":"nice","s":"N","a":"QUAL","f":"I","d":"N","an":"AB","w":10},{"id":"FK160","t":"plastic body quality looks very weak its light but a very soft and low quality of plastic body is there didnt like it because of the body material used feels like it will result in so much of damage to hdd if accidently fall off","r":3,"p":5599,"n":"Seagate One Touch with Password Protection for Windows & Mac with 3...","h":"decent product","s":"N","a":"QUAL","f":"","d":"N","an":"AB","w":45},{"id":"FK161","t":"good product size is little bit more tight fittingworth for money","r":4,"p":409,"n":"Men Regular Fit Black Cotton Blend Trousers","h":"not specified","s":"P","a":"SIZE","f":"M","d":"P","an":"AB","w":11},{"id":"FK162","t":"very good productresult immediatelyeasy to usebuilt quality is goodvalue for money","r":5,"p":190,"n":"YUV Digital LCD Pre-Calibrated TDS Meter Tester Portable Pen 0.01...","h":"fabulous!","s":"P","a":"PERF","f":"","d":"P","an":"AB","w":11},{"id":"FK163","t":"superb quality productpacking is very goodno damage productfast deliverythank u flipkart","r":5,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"super!","s":"P","a":"DELIV","f":"","d":"P","an":"AB","w":11},{"id":"FK164","t":"totally disappointed it makes huge noise","r":1,"p":1349,"n":"BAJAJ Crest Neo 1200 mm 3 Blade Ceiling Fan(Brown, Pack of 1)","h":"did not meet expectations","s":"N","a":"PERF","f":"","d":"N","an":"AB","w":6},{"id":"FK165","t":"i ordered size 28 s it was a little loose and a bit long too surely not ankle length","r":3,"p":559,"n":"Women Regular Fit Black Georgette Trousers","h":"","s":"N","a":"SIZE","f":"","d":"P","an":"AB","w":19},{"id":"FK166","t":"i am giving 4 starts bcoz the is harder than i thought but it is good for all kind of groundsand some stratches r coming on it just after playing from 2 weeks","r":4,"p":429,"n":"NIVIA Storm Football - Size: 5ÐÓ®ÐÂ ÐÓ®ÐÂ (Pack of 1, Multicolor)","h":"wonderful","s":"P","a":"DUR","f":"M","d":"U","an":"AB","w":33},{"id":"FK167","t":"value for money and good v performance","r":4,"p":24490,"n":"SAMSUNG 253 L Frost Free Double Door 3 Star RefrigeratorÐÒÐÓ®ÐÂ...","h":"pretty good","s":"P","a":"VALUE","f":"","d":"P","an":"AB","w":7},{"id":"FK168","t":"worst product ever received by flipkart reason sole its not good third class product who ever the vechlo maker is","r":1,"p":299,"n":"Men Black Sandal","h":"","s":"N","a":"QUAL","f":"I","d":"N","an":"AB","w":20},{"id":"FK169","t":"packing and product quality is ok but delivery service is totally disappointed he didnt give proper response this is my second time i has face this delivery issue your customer service also very bad this is my last order in this flipkart again i will not choose flipkart","r":1,"p":6999,"n":"PHILIPS MMS8085B/94 Convertible 80 W Bluetooth Home TheatreÐÓ®ÐÂ...","h":"useless product","s":"N","a":"DELIV","f":"M","d":"N","an":"AB","w":48},{"id":"FK170","t":"not good quality according to price","r":1,"p":189,"n":"ScotchBrite Sponge WipeLarge Pack of 3","h":"hated it!","s":"N","a":"VALUE","f":"","d":"N","an":"AB","w":6},{"id":"FK171","t":"burnt out exactly after the warranty period of 2 years","r":2,"p":5299,"n":"Butterfly Rhino Plus Wet GrinderÐÒÐÒÐÒÐÒ(Grey)","h":"could be way better","s":"N","a":"DUR","f":"","d":"N","an":"AB","w":10},{"id":"FK172","t":"i buy this fan in rs3300 next day it decreases price to rs3095 i loss rs205 pathetic purchasing experience","r":1,"p":3569,"n":"Atomberg Renesa 1200 mm BLDC Motor with Remote 3 Blade Ceiling...","h":"absolute rubbish!","s":"N","a":"VALUE","f":"A","d":"N","an":"AB","w":19},{"id":"FK173","t":"overall very goodbut warranty card 3 month ago","r":4,"p":7999,"n":"MAHARAJA WHITELINE 65 L Desert Air Cooler(White, Grey, Rambo Grey /...","h":"really nice","s":"P","a":"GEN","f":"A","d":"U","an":"AB","w":8},{"id":"FK174","t":"build quality is not good at all","r":3,"p":4399,"n":"Inalsa Easy Prep_ 800 W Food Processor(Black)","h":"nice","s":"N","a":"QUAL","f":"","d":"N","an":"AB","w":7},{"id":"FK175","t":"good looking very quick service also thanks","r":4,"p":399,"n":"Home Sizzler 214 cm 702 ft Polyester Semi Transparent Door Curtain...","h":"wonderful","s":"P","a":"DELIV","f":"","d":"P","an":"AB","w":7},{"id":"FK176","t":"i will not suggest to buy within a second it start heating u will get confused that is it a heater or vacuum cleaner","r":2,"p":2799,"n":"EUREKA FORBES Trendy Zip Dry Vacuum Cleaner with Reusable Dust...","h":"expected a better product","s":"N","a":"PERF","f":"S","d":"N","an":"AB","w":24},{"id":"FK177","t":"very nice cooler cools effectively even a large room very happy with the purchase","r":5,"p":9999,"n":"Crompton 75 L Desert Air Cooler(White, Teal, ACGC-DAC751)","h":"terrific purchase","s":"P","a":"PERF","f":"","d":"P","an":"AB","w":14},{"id":"FK178","t":"i tried every way i know still cant even connect to a bluetooth asked for return and flipkart says not available its like i lost money for nothing please dont buy its useless google dont know how customers use it so sad","r":1,"p":3499,"n":"Google Nest Mini (2nd Gen) with Google Assistant with Google...","h":"unsatisfactory","s":"N","a":"PERF","f":"","d":"N","an":"AB","w":42},{"id":"FK179","t":"just go for it best in class best in cooling and storage","r":5,"p":24490,"n":"SAMSUNG 253 L Frost Free Double Door 3 Star RefrigeratorÐÒÐÓ®ÐÂ...","h":"best in the market!","s":"P","a":"PERF","f":"","d":"P","an":"AB","w":12},{"id":"FK180","t":"very good performance and easy to use 5 star rating for such a easy delivery and installation","r":5,"p":12990,"n":"Haier 6.5 kg 5 star Ariel Wash Fully Automatic Top Load Brown,...","h":"terrific purchase","s":"P","a":"SERV","f":"","d":"P","an":"AB","w":17},{"id":"FK181","t":"not pure cotton ok ok type products","r":2,"p":379,"n":"Men Cargos","h":"","s":"U","a":"QUAL","f":"AI","d":"N","an":"B","w":7},{"id":"FK182","t":"very nice product i am so happy with this product","r":4,"p":849,"n":"Butterfly Rapid Kettle 1.5 Litre + Eco 750 Ml Water Bottle","h":"good quality product","s":"P","a":"GEN","f":"","d":"P","an":"B","w":10},{"id":"FK183","t":"this watch is little good because it is not a brand and within 2 monts it got stop working","r":2,"p":299,"n":"LS2821 Bleed Blue Day and Date Functioning Strap Adult Quartz...","h":"not specified","s":"N","a":"DUR","f":"","d":"P","an":"B","w":19},{"id":"FK184","t":"superb product love it very good quality same as shown in picture","r":4,"p":4319,"n":"PHILIPS HR7627/00 650 W Food Processor(White)","h":"good quality product","s":"P","a":"QUAL","f":"","d":"P","an":"B","w":12},{"id":"FK185","t":"terrific purchase nice quality and the product is too good but the speed of the motor is slightly slow","r":3,"p":4396,"n":"Butterfly Rhino 2 Ltr Wet GrinderÐÒÐÒÐÒÐÒ(Cherry Red)","h":"nice","s":"P","a":"PERF","f":"M","d":"P","an":"B","w":19},{"id":"FK186","t":"nice i like it very much","r":4,"p":339,"n":"288SDTL TIMEWEAR Silver Pink Dial Stainless Steel Strap Analog...","h":"","s":"P","a":"GEN","f":"","d":"P","an":"B","w":6},{"id":"FK187","t":"hp brand product but quality not as expected keys are made of very thin plasticthis must not expected from a big brand like hp","r":2,"p":1599,"n":"HP GK320 Wired USB Gaming KeyboardÐÒÐÓ®ÐÂ ÐÒÐÓ®ÐÂ (Black)","h":"bad quality","s":"N","a":"QUAL","f":"","d":"N","an":"B","w":24},{"id":"FK188","t":"such a good fragrance it is","r":5,"p":361,"n":"ENVY Combo Perfume For Men 60ML + 60ML Eau de Parfum - 120 ml(For Men)","h":"classy product","s":"P","a":"QUAL","f":"","d":"P","an":"B","w":6},{"id":"FK189","t":"very nice product thank you flipcart","r":5,"p":310,"n":"Magic Balloons Solid Birthday Decorations 95Pcs Silver Happy...","h":"just wow!","s":"P","a":"GEN","f":"","d":"P","an":"B","w":6},{"id":"FK190","t":"only 4 holes are there on the belt","r":2,"p":219,"n":"Women Party, Evening, Formal, Party Black Artificial Leather Belt","h":"","s":"N","a":"QUAL","f":"","d":"U","an":"B","w":8},{"id":"FK191","t":"product is good but size of wings and his hanging rod is too small","r":3,"p":2879,"n":"Candes Florence 1200 mm Energy Saving 3 Blade Ceiling Fan(Silver...","h":"just okay","s":"U","a":"SIZE","f":"M","d":"P","an":"B","w":14},{"id":"FK192","t":"its value for money since i got it for 800 bucks onlydont expect much clear sounds at higher volume levels for music7080 max works finebut it does the job since i just wanted to use these for my zoom call meetingsbattery is good","r":3,"p":1099,"n":"Mivi Roam2 5 W Bluetooth Speaker(Black, Mono Channel)","h":"good","s":"P","a":"VALUE","f":"M","d":"P","an":"B","w":43},{"id":"FK193","t":"happy to buy that good product in this price your work from or study will be rocks go for it","r":4,"p":1298,"n":"limraz furniture L 56 Engineered Wood Study TableFree Standing...","h":"wonderful","s":"P","a":"VALUE","f":"I","d":"P","an":"B","w":20},{"id":"FK194","t":"quality of the product is good u can buy","r":4,"p":739,"n":"Hello Baby Fabric SofaFinish Color sky blue Preassembled","h":"good quality product","s":"P","a":"QUAL","f":"","d":"P","an":"B","w":9},{"id":"FK195","t":"worst quality plastic is used avoid buying it","r":1,"p":2099,"n":"Pigeon Favourite 15024 500 W Juicer Mixer Grinder (4 Jars, White)","h":"utterly disappointed","s":"N","a":"QUAL","f":"","d":"N","an":"B","w":8},{"id":"FK196","t":"dont waste your money 2 times wrinkles came up n looking odd very poor quality","r":1,"p":379,"n":"Men Cargos","h":"","s":"N","a":"DUR","f":"","d":"N","an":"B","w":15},{"id":"FK197","t":"no pipe and no plug in this","r":4,"p":5499,"n":"BAJAJ 15 L Storage Water Geyser (Popular Plus 15 L, White)","h":"delightful","s":"N","a":"DELIV","f":"","d":"N","an":"B","w":7},{"id":"FK198","t":"i hate the size i thought it was bigger other than that it was good but please tell the size in cm or mm","r":3,"p":399,"n":"X ZINI Infrared Induction Helicopter Sensor Aircraft USB Charger 2...","h":"just okay","s":"U","a":"SIZE","f":"M","d":"P","an":"B","w":24},{"id":"FK199","t":"spin is ok but washer is not ok","r":2,"p":1299,"n":"Spotzero by Milton Prime Spin Mop","h":"could be way better","s":"N","a":"PERF","f":"M","d":"U","an":"B","w":8},{"id":"FK200","t":"nice one at this pricethanx flipkart","r":4,"p":1095,"n":"FLIPZON Baby 6 Shelve Unbreakable Material PVC Collapsible...","h":"nice product","s":"P","a":"VALUE","f":"","d":"P","an":"B","w":6},{"id":"FK201","t":"dont worry about dirty utensils utensils become shiny and clean after dishwasher cleaning","r":5,"p":44890,"n":"BOSCH SMS66GI01I Free Standing 13 Place Settings Intensive Kadhai...","h":"brilliant","s":"P","a":"PERF","f":"","d":"P","an":"B","w":13},{"id":"FK202","t":"for the price range is good product","r":5,"p":299,"n":"KUBER INDUSTRIES Shelf OrganizersBeige Cotton","h":"mind-blowing purchase","s":"P","a":"VALUE","f":"","d":"P","an":"B","w":7},{"id":"FK203","t":"the good1 bass2 design3 priceth bad1 no dolby audio it should be default from 2019 onwards2 sound quality could have been better","r":4,"p":9999,"n":"boAt Aavante Bar 2000 160 W Bluetooth SoundbarÐÒÐÓ®ÐÂ...","h":"worth the money","s":"U","a":"PERF","f":"MA","d":"P","an":"B","w":22},{"id":"FK204","t":"earlier was using neptune vxbought neptune fx online versionvery very basic modeldont expect much from this dishwasherpeople who wants dishwasher can buy it for very low price mentioned that i have using ifb dishwasher from 2008 comparative ifb has never let down even once till now quality service availablity of spare are readily available which is not in other brands","r":3,"p":29990,"n":"IFB Neptune FX Free Standing 12 Place Settings with Germ-Free...","h":"fair","s":"N","a":"PERF","f":"MA","d":"N","an":"B","w":60},{"id":"FK205","t":"delivery was within the given date which is good and football looks very awesome and strong but have to wait and watch the quality","r":4,"p":429,"n":"NIVIA Storm Football - Size: 5ÐÓ®ÐÂ ÐÓ®ÐÂ (Pack of 1, Multicolor)","h":"very good","s":"P","a":"DELIV","f":"M","d":"U","an":"B","w":24},{"id":"FK206","t":"very nice product i am using it till 4 years","r":5,"p":429,"n":"NIVIA Storm Football - Size: 5ÐÓ®ÐÂ ÐÓ®ÐÂ (Pack of 1, Multicolor)","h":"wonderful","s":"P","a":"DUR","f":"","d":"P","an":"B","w":10},{"id":"FK207","t":"i have been using it since 3 monthsfirst month it used to keep hot water hot for 8 hrs now it hardly keeps hot for 12 hrs","r":2,"p":648,"n":"MILTON Thermosteel Flip Lid 500 ml FlaskPack of 1 Silver Steel","h":"regular usage not good.","s":"N","a":"DUR","f":"","d":"U","an":"B","w":27},{"id":"FK208","t":"body of low quality plastic doesnt look premium with respect to price gap in body and upper transparent cover so easy access for insects etc","r":2,"p":15999,"n":"KENT Ace Extra/ Ace Alkaline 8 L RO UV UF TDS Control Alkaline UV...","h":"could be way better","s":"N","a":"QUAL","f":"","d":"N","an":"B","w":25},{"id":"FK209","t":"this is not apt for baby sitting bcoz it size is very small","r":1,"p":739,"n":"Hello Baby Fabric SofaFinish Color sky blue Preassembled","h":"worst experience ever!","s":"N","a":"SIZE","f":"","d":"N","an":"B","w":13},{"id":"FK210","t":"bellavita oud had a very intense and long lasting perfumegives you a rich and refreshing feeling and the packaging was amazingits perfect for personal use as well as for gifting purposes","r":5,"p":569,"n":"Bella vita organic OUD PARFUM Intense Perfume For Men & Women with...","h":"terrific","s":"P","a":"QUAL","f":"","d":"P","an":"B","w":31},{"id":"FK211","t":"basically you need a power sourceoutput wherever you need this toolwhich really doesnt make it portable plus google could simply add an additional exclusive bluetooth compatibility with smartphone so it could also function as bluetooth speakers","r":3,"p":3499,"n":"Google Nest Mini (2nd Gen) with Google Assistant Smart Speaker(Chalk)","h":"fair","s":"N","a":"PERF","f":"","d":"P","an":"B","w":36},{"id":"FK212","t":"very good product and yields more juice as mentioned 35 extra but remember to remove seeds from citrus fruits as the motor is very powerful and crushes the seeds as wellthe purchase of the product is worthwhile looks amazing as well just go for it","r":5,"p":12999,"n":"AGARO Imperial Slow Juicer 240 Juicer Grey","h":"awesome","s":"P","a":"PERF","f":"","d":"P","an":"B","w":45},{"id":"FK213","t":"worst product nobody should purchase this item","r":1,"p":188,"n":"Divinext 1 week Pill Medicine Tablet Case box Storage 28 Days Pill...","h":"terrible product","s":"N","a":"GEN","f":"","d":"N","an":"B","w":7},{"id":"FK214","t":"good quality vara lavel cycle please buy more","r":5,"p":4499,"n":"LEADER Scout 26T SEA Blue BLACK for Ride 26 T Mountain CycleÐÓ®ÐÂ...","h":"mind-blowing purchase","s":"P","a":"QUAL","f":"I","d":"P","an":"B","w":8},{"id":"FK215","t":"nice product i am waiting for instalation of this product","r":5,"p":42000,"n":"BOSCH SMS66GW01I Free Standing 13 Place Settings Intensive Kadhai...","h":"simply awesome","s":"P","a":"SERV","f":"A","d":"P","an":"B","w":10},{"id":"FK216","t":"the spanner and tds meter should be provided doesn t matter by adding the costrest is good","r":5,"p":13999,"n":"Pureit Max Water Saver 10 L RO UV MF Water Purifier with Eco...","h":"terrific","s":"P","a":"GEN","f":"M","d":"P","an":"B","w":17},{"id":"FK217","t":"superb best quality and i expense rs200 for refiting ok","r":4,"p":5999,"n":"HERO Skyper 26T 26 T Mountain/Hardtail CycleÐÓ®ÐÂ ÐÓ®ÐÂ (Single...","h":"nice product","s":"P","a":"QUAL","f":"M","d":"P","an":"B","w":10},{"id":"FK218","t":"product is good according to price","r":5,"p":348,"n":"TITIRANGI 4 Pack 4WD Monster Truck Cars,Push and Go Toy Trucks...","h":"terrific purchase","s":"P","a":"VALUE","f":"","d":"P","an":"B","w":6},{"id":"FK219","t":"blanket is just awesome but its single we thought double so disappointed","r":5,"p":599,"n":"RIAN Animal Single Mink Blanket for Mild WinterPolyester Brown Grey","h":"great product","s":"U","a":"SIZE","f":"MA","d":"U","an":"B","w":12},{"id":"FK220","t":"seems a little costlier cloth good","r":4,"p":219,"n":"Baby Boys Baby Girls Casual Tshirt ShortsBlue","h":"not specified","s":"P","a":"QUAL","f":"M","d":"P","an":"B","w":6},{"id":"FK221","t":"very good product and awesome and perfect quality and performance is the best","r":4,"p":46999,"n":"Lenovo IdeaPad 3 Ryzen 5 Hexa Core 5500U - (8 GB/512 GB SSD/Windows...","h":"value-for-money","s":"P","a":"PERF","f":"","d":"P","an":"B","w":13},{"id":"FK222","t":"thanks flipkart timely delivery nice product","r":4,"p":218,"n":"Lakm Eyeconic Kajal Twin Pack(Deep Black, 0.7 g)","h":"worth the money","s":"P","a":"DELIV","f":"","d":"P","an":"B","w":6},{"id":"FK223","t":"bluetooth connection problem calling problem sound good","r":2,"p":1999,"n":"OnePlus Bullets Wireless Z2 with Fast Charge, 30 Hrs Battery Life,...","h":"could be way better","s":"N","a":"PERF","f":"M","d":"N","an":"B","w":7},{"id":"FK224","t":"nice product at a reasonable price and the bag quality is also good","r":5,"p":449,"n":"cello ColourUp Hobby Bag of Assorted Stationery|Crayons, Sketch...","h":"wonderful","s":"P","a":"VALUE","f":"","d":"P","an":"B","w":13},{"id":"FK225","t":"very bad ink dont buy these product ink cannot supported by my printer it cannot show","r":1,"p":421,"n":"Ang Refill kit Compatible Dye ink for HP cartridge 805, 803, 680,...","h":"worthless","s":"N","a":"PERF","f":"","d":"N","an":"B","w":16},{"id":"FK226","t":"product is good but demand a delivery boy tips thats why 4 rating","r":4,"p":2970,"n":"Furnifry Wooden Wall Mounted TV Entertainment UnitTV StandTV...","h":"value-for-money","s":"P","a":"DELIV","f":"M","d":"P","an":"B","w":13},{"id":"FK227","t":"this camera better to buy in this prise and simply super options","r":4,"p":30999,"n":"Canon EOS 3000D DSLR Camera 1 Camera Body, 18 - 55 mm Lens(Black)","h":"really nice","s":"P","a":"VALUE","f":"I","d":"P","an":"B","w":12},{"id":"FK228","t":"this headphones sound quality osam bettare backup beutiyfull nice headphone","r":5,"p":1999,"n":"OnePlus Bullets Wireless Z2 with Fast Charge, 30 Hrs Battery Life,...","h":"terrific purchase","s":"P","a":"PERF","f":"I","d":"P","an":"B","w":10},{"id":"FK229","t":"bicycle is worth the money it is durable go for it","r":5,"p":5499,"n":"Urban Terrain Rio with Complete Accessories & Mobile Tracking App...","h":"brilliant","s":"P","a":"DUR","f":"","d":"P","an":"B","w":11},{"id":"FK230","t":"it is very nice i love it","r":5,"p":269,"n":"Unique designed professioal and luxury style different 005 Analog...","h":"not specified","s":"P","a":"GEN","f":"","d":"P","an":"B","w":7},{"id":"FK231","t":"paltes are smallbut over all good","r":3,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"does the job","s":"P","a":"SIZE","f":"M","d":"P","an":"B","w":6},{"id":"FK232","t":"nice productworth money compatible for moderate daily use etc but need to add return or replace policy","r":3,"p":29990,"n":"APPLE iPad (9th Gen) 64 GB ROM 10.2 inch with Wi-Fi Only (Space Grey)","h":"decent product","s":"P","a":"VALUE","f":"M","d":"P","an":"B","w":17},{"id":"FK233","t":"very dumb product waste of money","r":1,"p":980,"n":"Dallao Waterproof Remote Controlled Rock Crawler RC Monster Car...","h":"waste of money!","s":"N","a":"GEN","f":"","d":"N","an":"B","w":6},{"id":"FK234","t":"its not good if compare to alexa devices","r":4,"p":3499,"n":"Google Nest Mini (2nd Gen) with Google Assistant with Google...","h":"good quality product","s":"N","a":"PERF","f":"A","d":"N","an":"B","w":8},{"id":"FK235","t":"undoubtedly the best indian geography for any competitive examthe best is the way all the things are written in a systematic manner you dont need to make separate notestons of diagrams and maps are presentthanks to study iq team","r":5,"p":338,"n":"Principles Of Indian Geography English 1st Edition For UPSC CSE...","h":"must buy!","s":"P","a":"QUAL","f":"","d":"P","an":"B","w":39},{"id":"FK236","t":"steel rod is not strong enough to whip","r":3,"p":699,"n":"Allwin Home Cleaning 360 Spin Floor Cleaning Easy Advance Tech...","h":"does the job","s":"N","a":"QUAL","f":"","d":"N","an":"B","w":8},{"id":"FK237","t":"product is nice till date i am satisfied with 1st wash for half load and quick setting product is silent while on operation i would have given 45 stars for the company and product but for installation i gave low stars and demo was never given we did it ourself","r":3,"p":44890,"n":"BOSCH SMS66GI01I Free Standing 13 Place Settings Intensive Kadhai...","h":"good","s":"P","a":"PERF","f":"MA","d":"U","an":"B","w":50},{"id":"FK238","t":"this is a great product from google","r":5,"p":3499,"n":"Google Nest Mini (2nd Gen) with Google Assistant Smart Speaker(Chalk)","h":"must buy!","s":"P","a":"GEN","f":"","d":"P","an":"B","w":7},{"id":"FK239","t":"its a basic microwave oven basically used for reheating food does the job as desired","r":4,"p":4498,"n":"BAJAJ 17 L Solo Microwave Oven1701MT White","h":"very good","s":"P","a":"PERF","f":"","d":"P","an":"B","w":15},{"id":"FK240","t":"its a very nice watch as low cost but their band made of plastic not steel chain overall this product is very helpful and good","r":3,"p":209,"n":"KJR32 KJR32 Analog Watch For Men","h":"not specified","s":"P","a":"VALUE","f":"M","d":"P","an":"B","w":25},{"id":"FK241","t":"good product but dinner plates are smaller in size 11inch would hv been better","r":4,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"good choice","s":"P","a":"SIZE","f":"M","d":"P","an":"B","w":14},{"id":"FK242","t":"the elastic rope is extremely small not even half the required","r":2,"p":367,"n":"Men Cargos","h":"","s":"N","a":"SIZE","f":"","d":"U","an":"B","w":11},{"id":"FK243","t":"decent performance but some drawbacks you cant open medium quality pics taken by other mobile in it its just a entry level processor dont expect more from it","r":2,"p":27999,"n":"realme Pad X 6 GB RAM 128 GB ROM 11 inch with Wi-Fi Tablet (Glacier...","h":"slightly disappointed","s":"U","a":"PERF","f":"M","d":"U","an":"B","w":28},{"id":"FK244","t":"it so nice my daughter loved this thank u flipkart","r":5,"p":449,"n":"DOMS Pencil Smart Kit","h":"super!","s":"P","a":"GEN","f":"","d":"P","an":"B","w":10},{"id":"FK245","t":"very bad product anyone dont buy this product","r":2,"p":429,"n":"NIVIA Storm Football - Size: 5ÐÓ®ÐÂ ÐÓ®ÐÂ (Pack of 1, Multicolor)","h":"slightly disappointed","s":"N","a":"GEN","f":"","d":"N","an":"B","w":8},{"id":"FK246","t":"so worse quality light is not working","r":1,"p":193,"n":"Magic Balloons Solid Happy Birthday Balloon Set Of 35 Balloons 1...","h":"worthless","s":"N","a":"PERF","f":"","d":"N","an":"B","w":7},{"id":"FK247","t":"super smell but 1 house stand","r":5,"p":361,"n":"ENVY Combo Perfume For Men 60ML + 60ML Eau de Parfum - 120 ml(For Men)","h":"simply awesome","s":"P","a":"QUAL","f":"MAI","d":"P","an":"B","w":6},{"id":"FK248","t":"worst productonly one week it worked fine later on it didnt work at all this company is not producing good product now a daysv have lost trust on online shopping because of this","r":1,"p":2999,"n":"Butterfly Rapid 750 W Juicer Mixer Grinder (4 Jars, Black)","h":"did not meet expectations","s":"N","a":"DUR","f":"","d":"N","an":"B","w":33},{"id":"FK249","t":"boat speakers and headphones are usually best this one is at par bass is good along with sound quality build quality is nice and durable battery back up is good with fast charging lasts for almost 1012 hours worth every penny one must go if not brand freak","r":5,"p":1199,"n":"boAt Rockerz 510 Super Extra Bass Bluetooth Headset(Molten Orange,...","h":"just wow!","s":"P","a":"PERF","f":"","d":"P","an":"B","w":48},{"id":"FK250","t":"i have this products because very low quality","r":1,"p":499,"n":"Men Cargos","h":"","s":"N","a":"QUAL","f":"I","d":"N","an":"B","w":8},{"id":"FK251","t":"great product one of the best from lg line ups","r":5,"p":50999,"n":"LG DFB424FW Free Standing 14 Place Settings Intensive Kadhai...","h":"fabulous!","s":"P","a":"GEN","f":"","d":"P","an":"B","w":10},{"id":"FK252","t":"wi fi media streaming limits a few formats only tubicast app itself a bogus it is not playing continuously each video or audio you have to select for casting after one played hd channels is not coded seperately only sd channels are listed","r":3,"p":1550,"n":"Catvision CSR-401HP WIFI Media Streaming Device(Black)","h":"nice","s":"N","a":"PERF","f":"","d":"P","an":"B","w":43},{"id":"FK253","t":"best bluetooth headphonemust buylooks expensive comparative to other headphones in marketbut amazing quality","r":5,"p":1999,"n":"OnePlus Bullets Wireless Z2 Bluetooth Headset(Acoustic Red, In the...","h":"classy product","s":"P","a":"QUAL","f":"","d":"P","an":"B","w":13},{"id":"FK254","t":"cheap quality it is not a fast charger","r":2,"p":399,"n":"SB 30 W 4 A Mobile 30W -VOOC,DART,FLASH with Type-C Cable Charging...","h":"not good","s":"N","a":"QUAL","f":"","d":"N","an":"B","w":8},{"id":"FK255","t":"12 kg rice grains 45to 1 hr takes timereally diss appointment to this product","r":2,"p":4199,"n":"Butterfly Rapid Plus Wet Grinder with Coconut Scraper...","h":"not good","s":"N","a":"PERF","f":"I","d":"N","an":"B","w":14},{"id":"FK256","t":"in this range awesome product perfect fit","r":4,"p":409,"n":"Men Regular Fit Black Cotton Blend Trousers","h":"not specified","s":"P","a":"SIZE","f":"","d":"P","an":"B","w":7},{"id":"FK257","t":"cloth not good and quality also","r":1,"p":655,"n":"S K Store Carbon Steel Collapsible WardrobeFinish Color Black...","h":"unsatisfactory","s":"N","a":"QUAL","f":"","d":"N","an":"B","w":6},{"id":"FK258","t":"its good a lil hard to fix but overall good","r":3,"p":625,"n":"CMerchants Multi Organiser BLue4 Book Shelf Metal Open Book...","h":"just okay","s":"P","a":"GEN","f":"M","d":"P","an":"B","w":10},{"id":"FK259","t":"bad choicenot good product taking too much time to grind and fumes coming after 30 minutesi cant replace the product as its been used and packing material thrown","r":2,"p":4396,"n":"Butterfly Rhino 2 Ltr Wet GrinderÐÒÐÒÐÒÐÒ(Cherry Red)","h":"bad choice","s":"N","a":"PERF","f":"","d":"N","an":"B","w":28},{"id":"FK260","t":"waste product dont buyit is spoiling food at bottom of the vessel water rice ratio is full different really so bad waste of money but looking good but no use","r":2,"p":1599,"n":"Flipkart SmartBuy CFXB18 Electric Rice Cooker(1.8 L, White, Blue)","h":"not good","s":"N","a":"PERF","f":"","d":"N","an":"B","w":30},{"id":"FK261","t":"im not satisfied with this toys","r":1,"p":348,"n":"TITIRANGI 4 Pack 4WD Monster Truck Cars,Push and Go Toy Trucks...","h":"absolute rubbish!","s":"N","a":"GEN","f":"","d":"N","an":"B","w":6},{"id":"FK262","t":"shows three batteries but given one rechargeable battery rest are good","r":3,"p":945,"n":"Dallao Waterproof Remote Controlled Rock Crawler RC Monster Car...","h":"does the job","s":"P","a":"DELIV","f":"MA","d":"P","an":"B","w":11},{"id":"FK263","t":"never purchase waste of money i bought it on aug 2021 within a month it stopped working not at all good","r":2,"p":12990,"n":"Haier 6.5 kg 5 star Ariel Wash Fully Automatic Top Load Brown,...","h":"expected a better product","s":"N","a":"DUR","f":"","d":"N","an":"B","w":21},{"id":"FK264","t":"really good i love this shoping amazing","r":5,"p":184,"n":"Aero Seeds Aero Seeds 45 Varieties 2700 seedsOrganicHybrid Fruits...","h":"perfect product!","s":"P","a":"GEN","f":"I","d":"P","an":"B","w":7},{"id":"FK265","t":"this boat watch is very good","r":5,"p":1699,"n":"boAt Wave Neo with 1.69 inch , 2.5D Curved Display & Multiple...","h":"wonderful","s":"P","a":"GEN","f":"","d":"P","an":"B","w":6},{"id":"FK266","t":"its look goodbut the quality is poor inscet dust are producing after 1 month regular clean is reguired 23 days or inscet start growing in this product","r":1,"p":450,"n":"US DZIRE Pendants Ceiling LampBrown","h":"unsatisfactory","s":"N","a":"QUAL","f":"","d":"P","an":"B","w":27},{"id":"FK267","t":"awesome product received for 18k is worth for the money i spent","r":4,"p":13999,"n":"Mi 5A 80 cm (32 inch) HD Ready LED Smart Android TV with Dolby...","h":"wonderful","s":"P","a":"VALUE","f":"","d":"P","an":"B","w":12},{"id":"FK268","t":"product was fine but after using 1 month 1jar stopped working dont know why rest are working perfectly","r":3,"p":6525,"n":"BAJAJ Fx11 Food Factory 600 W Food Processor(White)","h":"okay product","s":"U","a":"DUR","f":"M","d":"N","an":"B","w":18},{"id":"FK269","t":"fit and finish is not good","r":1,"p":1298,"n":"limraz furniture L 56 Engineered Wood Study TableFree Standing...","h":"unsatisfactory","s":"N","a":"QUAL","f":"","d":"U","an":"B","w":6},{"id":"FK270","t":"very poor quality juz broken within 2 days waste of money","r":1,"p":357,"n":"Soaring Engineered Wood Study TableFinish Color green DIYDoItYourself","h":"utterly disappointed","s":"N","a":"DUR","f":"","d":"N","an":"B","w":11},{"id":"FK271","t":"its nice but you need to make hole according to your waist size its easy to do that overall nice","r":3,"p":219,"n":"Women Party, Evening, Formal, Party Black Artificial Leather Belt","h":"","s":"P","a":"SIZE","f":"M","d":"P","an":"B","w":20},{"id":"FK272","t":"the fan looks great on ceiling speed wise good the pic taken while running at boost speed which is 6th stage remote is handy and nice its on costlier side though not sure abt electricity saving as it claims 28w consumption upon switching on its a slow starter","r":4,"p":3569,"n":"Atomberg Renesa 1200 mm BLDC Motor with Remote 3 Blade Ceiling...","h":"very good","s":"P","a":"PERF","f":"M","d":"P","an":"B","w":48},{"id":"FK273","t":"it get fully damaged and puncher","r":1,"p":429,"n":"NIVIA Storm Football - Size: 5ÐÓ®ÐÂ ÐÓ®ÐÂ (Pack of 1, Multicolor)","h":"very poor","s":"N","a":"DUR","f":"I","d":"N","an":"B","w":6},{"id":"FK274","t":"quick delivery and on time instalation","r":5,"p":13999,"n":"Pureit Max Water Saver 10 L RO UV MF Water Purifier with Eco...","h":"terrific","s":"P","a":"SERV","f":"","d":"P","an":"B","w":6},{"id":"FK275","t":"there is no carry bag and no memory card","r":3,"p":30999,"n":"Canon EOS 3000D DSLR Camera 1 Camera Body, 18 - 55 mm Lens(Black)","h":"fair","s":"N","a":"DELIV","f":"","d":"N","an":"B","w":9},{"id":"FK276","t":"good for formal look quality could have been better but happy with the purchase good experience with flipkart","r":3,"p":1169,"n":"VH000010A Analog Watch - For Women","h":"","s":"P","a":"QUAL","f":"M","d":"P","an":"B","w":18},{"id":"FK277","t":"very very bad product please dont buy it","r":1,"p":493,"n":"ANTIOUE MART Wooden Set Top Box Stand Wall Mounted TV Cabinets Wall...","h":"worst experience ever!","s":"N","a":"GEN","f":"","d":"N","an":"B","w":8},{"id":"FK278","t":"they are niceto see and play","r":4,"p":1599,"n":"Dhawani Skating Shoe have different size and with PU LED wheel...","h":"delightful","s":"P","a":"GEN","f":"","d":"P","an":"B","w":6},{"id":"FK279","t":"fabric is soft and lyt wieght but stiching is not so gudjust ok ok","r":3,"p":367,"n":"Men Cargos","h":"","s":"U","a":"QUAL","f":"MI","d":"N","an":"B","w":14},{"id":"FK280","t":"jar steel quality is very low","r":3,"p":3249,"n":"Prestige Plus Atlas 750 W Juicer Mixer Grinder (4 Jars, Blue, White)","h":"nice","s":"N","a":"QUAL","f":"","d":"N","an":"B","w":6},{"id":"FK281","t":"price quality is very good and covering sefty is fine","r":3,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"fair","s":"P","a":"VALUE","f":"I","d":"P","an":"B","w":10},{"id":"FK282","t":"its a nice product go for it","r":5,"p":14146,"n":"Woodbuzz Engineered Wood Study TableFree Standing Finish Color...","h":"terrific purchase","s":"P","a":"GEN","f":"","d":"P","an":"B","w":7},{"id":"FK283","t":"please dont buy sound quality is very slow","r":1,"p":1349,"n":"ZEBRONICS Zeb-Vita Plus 16 W Bluetooth Laptop/Desktop...","h":"very poor","s":"N","a":"PERF","f":"","d":"N","an":"B","w":8},{"id":"FK284","t":"excellent camera really happy with the purchase","r":5,"p":30999,"n":"Canon EOS 3000D DSLR Camera 1 Camera Body, 18 - 55 mm Lens(Black)","h":"must buy!","s":"P","a":"PERF","f":"","d":"P","an":"B","w":7},{"id":"FK285","t":"this is very low quality product without doing anything plates cracked automatically","r":1,"p":1299,"n":"cello Pack of 18 Opalware Cello Dazzle Lush Fiesta Opalware Dinner...","h":"unsatisfactory","s":"N","a":"DUR","f":"","d":"N","an":"B","w":12},{"id":"FK286","t":"excellent producti bought it for my mom and she is very happy","r":5,"p":1469,"n":"NP2598WM03 Analog Watch - For Women","h":"","s":"P","a":"GEN","f":"","d":"P","an":"B","w":12},{"id":"FK287","t":"not bad good product carefully used long lasting","r":5,"p":299,"n":"RinkiHF Blue Acrylic Carpet132 cm X 183 cm Rectangle","h":"terrific","s":"P","a":"DUR","f":"A","d":"P","an":"B","w":8},{"id":"FK288","t":"worth purchasing get satisfaction with this product","r":5,"p":648,"n":"MILTON Thermosteel Flip Lid 500 ml FlaskPack of 1 Silver Steel","h":"perfect product!","s":"P","a":"GEN","f":"","d":"P","an":"B","w":7},{"id":"FK289","t":"nice product in range upto 6k","r":3,"p":7299,"n":"LUMINOUS ZELIO 110012V Ecomm Pure Sine Wave Inverter","h":"decent product","s":"P","a":"VALUE","f":"","d":"P","an":"B","w":6},{"id":"FK290","t":"its a pratice ball made up of rubber not recommended for playing flipkart thanks for right time deliverythe ball is hard the ball is not recommended for new commer","r":2,"p":429,"n":"NIVIA Storm Football - Size: 5ÐÓ®ÐÂ ÐÓ®ÐÂ (Pack of 1, Multicolor)","h":"moderate","s":"N","a":"QUAL","f":"M","d":"P","an":"B","w":29},{"id":"FK291","t":"this bella vita oud perfume has amazing fragrance which stays on you for good decent time it is perfect for gifting or for your own daliy useallover it is good perfume love it","r":5,"p":569,"n":"Bella vita organic OUD PARFUM Intense Perfume For Men & Women with...","h":"classy product","s":"P","a":"QUAL","f":"","d":"P","an":"B","w":33},{"id":"FK292","t":"wonderful charger original infinix mobile charger","r":5,"p":449,"n":"Infinix 10W Quick Charger combo for Infinx devices (MicroUSB -...","h":"terrific purchase","s":"P","a":"GEN","f":"","d":"P","an":"B","w":6},{"id":"FK293","t":"good working condition design and specifications in reasonable price right time delivery by vendors thanks to flipkart to make us satisfied with your services","r":5,"p":9499,"n":"IFB 23 L Convection Microwave Oven23SC3 Silver","h":"worth every penny","s":"P","a":"VALUE","f":"","d":"P","an":"B","w":24},{"id":"FK294","t":"sound is not good missing speak option ok in less price","r":3,"p":7999,"n":"Thomson Alpha 80 cm (32 inch) HD Ready LED Smart Linux TV with 30 W...","h":"does the job","s":"U","a":"PERF","f":"M","d":"N","an":"B","w":11},{"id":"FK295","t":"this product is very nice and this speaker sound is very good","r":4,"p":1699,"n":"boAt Aavante Bar 500 Portable Soundbar 10 W Bluetooth...","h":"good quality product","s":"P","a":"PERF","f":"","d":"P","an":"B","w":12},{"id":"FK296","t":"transfer rate is very less in kb disappointed with transfer speed","r":2,"p":4449,"n":"Seagate One Touch with Password Protection for Windows & Mac with 3...","h":"moderate","s":"N","a":"PERF","f":"","d":"N","an":"B","w":11},{"id":"FK297","t":"very good product for sofa cleaning best in this price range","r":5,"p":1599,"n":"AGARO Regal Hand-held Vacuum CleanerÐÒÐÓ®ÐÂ ÐÒÐÓ®ÐÂ (Black)","h":"must buy!","s":"P","a":"VALUE","f":"","d":"P","an":"B","w":11},{"id":"FK298","t":"excellent sound i cant believe it sounds good base is well when plying with bluetooth excellent deal at this price design also good","r":5,"p":4999,"n":"Mivi Fort S100 with 2 in-built subwoofers, Made in India 100 W...","h":"brilliant","s":"P","a":"PERF","f":"I","d":"P","an":"B","w":23},{"id":"FK299","t":"one is little with loose cap","r":3,"p":218,"n":"Lakm Eyeconic Kajal Twin Pack(Deep Black, 0.7 g)","h":"just okay","s":"N","a":"QUAL","f":"A","d":"N","an":"B","w":6},{"id":"FK300","t":"charging cable is not coming with the box","r":3,"p":1349,"n":"ZEBRONICS Zeb-Vita Plus 16 W Bluetooth Laptop/Desktop...","h":"just okay","s":"N","a":"DELIV","f":"","d":"U","an":"B","w":8}],"stats":{"records":300,"products":194,"avg_words":16.26,"median_words":11.0,"min_words":6,"max_words":60,"avg_chars":88.1,"vocab":1291,"rating_counts":{"1":50,"2":45,"3":60,"4":60,"5":85},"label_counts":{"Positive":160,"Neutral":24,"Negative":116},"words_by_label":{"Negative":17.41,"Neutral":16.33,"Positive":15.41},"aspect_counts":{"Performance":85,"Product Quality":61,"General":40,"Value for Money":33,"Durability":28,"Size, Fit & Comfort":20,"Delivery & Packaging":19,"Service & Installation":14},"aspect_x_sent":{"Delivery & Packaging":{"Positive":12,"Neutral":0,"Negative":7},"Durability":{"Positive":5,"Neutral":1,"Negative":22},"General":{"Positive":31,"Neutral":1,"Negative":8},"Performance":{"Positive":43,"Neutral":10,"Negative":32},"Product Quality":{"Positive":22,"Neutral":5,"Negative":34},"Service & Installation":{"Positive":10,"Neutral":1,"Negative":3},"Size, Fit & Comfort":{"Positive":7,"Neutral":6,"Negative":7},"Value for Money":{"Positive":30,"Neutral":0,"Negative":3}},"rating_x_sent":{"1":{"Positive":1,"Neutral":0,"Negative":49},"2":{"Positive":0,"Neutral":6,"Negative":39},"3":{"Positive":24,"Neutral":12,"Negative":24},"4":{"Positive":53,"Neutral":4,"Negative":3},"5":{"Positive":82,"Neutral":2,"Negative":1}},"flag_counts":{"Mixed":73,"Sarcasm":3,"Informal/Code-mixed":32,"Ambiguous":25},"any_flag":110,"mismatch":53,"agreement":{"n":60,"agree":51,"po":0.85,"pe":0.43333333333333335,"kappa":0.7352941176470588,"confusion":{"Positive":{"Positive":28,"Neutral":2,"Negative":0},"Neutral":{"Positive":3,"Neutral":1,"Negative":2},"Negative":{"Positive":1,"Neutral":1,"Negative":22}}},"top_words":{"Positive":[["good",92],["nice",44],["quality",33],["price",18],["best",17],["delivery",14],["sound",12],["money",11],["happy",11],["awesome",11]],"Neutral":[["good",14],["quality",6],["sound",4],["small",4],["working",4],["size",4],["dont",3],["bad",3],["level",3],["price",2]],"Negative":[["quality",39],["good",24],["dont",18],["money",17],["waste",14],["bad",14],["working",9],["month",8],["worst",8],["poor",7]]},"bigrams":[["quality is",22],["very good",22],["good product",19],["is good",19],["nice product",16],["not good",15],["of money",13],["very nice",13],["very bad",11],["this price",10],["good but",10],["dont buy",10]],"review_titles_unique":63,"review_title_null":23,"vs_dataset_label":{"agree_pct":80.0,"kappa":0.638,"crosstab":{"Negative":{"Negative":87,"Neutral":15,"Positive":14},"Neutral":{"Negative":9,"Neutral":3,"Positive":12},"Positive":{"Negative":3,"Neutral":7,"Positive":150}}},"vs_star":{"agree_pct":78.3,"kappa":0.641}},"practice":[{"id":"FK127","a":"U","b":"P","final":"U","rule":"R3","why":"Praise is hedged (\"good good ok ok\") and followed by a complaint about a missing adaptor. No overall verdict."},{"id":"FK133","a":"U","b":"N","final":"N","rule":"R2","why":"\"its okay product\" is a hedge. The concrete defects, noise and humidity, dominate."},{"id":"FK141","a":"P","b":"U","final":"P","rule":"R1","why":"\"basic\" names the product category, not an evaluation. \"very good product\" is explicit."},{"id":"FK144","a":"P","b":"N","final":"P","rule":"R7","why":"\"so complaints\" is a typo for \"no complaints\", read alongside \"good for the price\"."},{"id":"FK149","a":"P","b":"U","final":"P","rule":"R4","why":"The product is praised. Only packaging, a peripheral aspect, is criticised."},{"id":"FK155","a":"N","b":"U","final":"N","rule":"R2","why":"A foot hitting the front wheel is a functional design flaw. \"looks ok\" is secondary."},{"id":"FK166","a":"P","b":"U","final":"P","rule":"R1","why":"Explicit verdict: \"it is good for all kind of grounds\". The scratches are minor."},{"id":"FK172","a":"N","b":"U","final":"N","rule":"-","why":"The complaint is about price, not the product, but the attitude (\"pathetic\") is clearly negative."},{"id":"FK173","a":"U","b":"P","final":"P","rule":"R1","why":"Explicit verdict \"overall very good\". The warranty clause is unclear, so it is flagged Ambiguous."},{"id":"FK018","a":"U","b":"U","final":"U","rule":"R3","why":"Sound praised, wall mount called \"very bad\". Five stars, but the text is balanced with no verdict."},{"id":"FK029","a":"N","b":"N","final":"N","rule":"R5","why":"Five stars and the headline \"brilliant\", yet the text says \"third class product\". Label the text."},{"id":"FK176","a":"N","b":"N","final":"N","rule":"R6","why":"\"is it a heater or vacuum cleaner\" mocks overheating. Label the intended meaning."}],"rules":{"R1":"Explicit overall verdict decides the label","R2":"A concrete defect outweighs a vague hedge","R3":"Balanced contrast without a verdict is Neutral","R4":"Core product praised, peripheral aspect criticised: Positive","R5":"Label the text, never the star rating or headline","R6":"Sarcasm: label the intended meaning","R7":"Typos and Hinglish: label the most plausible meaning","R8":"Questions and purely factual statements are Neutral","R9":"Comparisons: stance towards the reviewed product","R10":"Conditional or future statements: current stance, flag Ambiguous"}};
+(function(){
+"use strict";
+const R = DATA.records, ST = DATA.stats, byId = Object.fromEntries(R.map(r => [r.id, r]));
+const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+// anime.js pauses while a tab is hidden; settle() jumps any unfinished animation to its end state.
+const A0 = window.anime && !RM ? window.anime : null;
+const settle = a => { setTimeout(() => { if (!a.completed) a.seek(a.duration); }, a.duration + 400); return a; };
+const A = A0 ? Object.assign(p => settle(A0(p)), A0, {timeline: p => { const t = A0.timeline(p); setTimeout(() => settle(t), 0); return t; }}) : null;
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const NAME = {P:"Positive", U:"Neutral", N:"Negative"}, ORDER = ["P","U","N"];
+const ASP = {QUAL:"Product quality", PERF:"Performance", VALUE:"Value for money", DELIV:"Delivery & packaging", SERV:"Service & installation", SIZE:"Size, fit & comfort", DUR:"Durability", GEN:"General"};
+const FLAG = {M:"Mixed", S:"Sarcasm", I:"Informal or Hinglish", A:"Ambiguous"};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const lbl = s => `<span class="lbl ${s}">${NAME[s]}</span>`;
+const stars = n => `<span class="stars" aria-label="${n} of 5 stars">${"★".repeat(n)}<s>${"★".repeat(5 - n)}</s></span>`;
+const store = {get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}, set(k, v){try{localStorage.setItem(k, JSON.stringify(v))}catch(e){}}};
+
+/* cue words */
+const NEG = new Set("not no dont didnt never nothing cant isnt doesnt wasnt wont".split(" "));
+const CON = new Set("but otherwise though however except although".split(" "));
+const POSW = new Set("good nice best awesome excellent superb amazing love loved happy perfect worth great fantastic wonderful satisfied recommend super fine lovely beautiful useful".split(" "));
+const NEGW = new Set("bad worst waste poor broken damaged pathetic useless cheap disappointed stopped defective wrost horrible terrible hate noisy worthless irritating rubbish".split(" "));
+const cues = t => esc(t).split(/(\s+)/).map(tok => {
+  const w = tok.toLowerCase().replace(/[^a-z]/g, "");
+  return !w ? tok : NEG.has(w) ? `<span class="cue cue-neg">${tok}</span>` : CON.has(w) ? `<span class="cue cue-con">${tok}</span>`
+    : POSW.has(w) ? `<span class="cue cue-p">${tok}</span>` : NEGW.has(w) ? `<span class="cue cue-n">${tok}</span>` : tok;
+}).join("");
+
+/* tooltip */
+const tip = $("#tip");
+const moveTip = e => { const w = tip.offsetWidth, h = tip.offsetHeight; let x = e.clientX + 14, y = e.clientY + 14; if (x + w > innerWidth - 8) x = e.clientX - w - 14; if (y + h > innerHeight - 8) y = e.clientY - h - 14; tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px"; };
+function bindTip(el, fn){
+  el.addEventListener("pointerenter", e => { tip.innerHTML = fn(); tip.classList.add("on"); moveTip(e); });
+  el.addEventListener("pointermove", moveTip);
+  el.addEventListener("pointerleave", () => tip.classList.remove("on"));
+  el.addEventListener("blur", () => tip.classList.remove("on"));
+}
+function seg(sel, fn){ $$(`${sel} button`).forEach(b => b.addEventListener("click", () => { $$(`${sel} button`).forEach(x => x.setAttribute("aria-pressed", x === b)); fn(b.dataset.m ?? b.dataset.v); })); }
+
+/* theme */
+const root = document.documentElement, saved = store.get("cce2-theme");
+if (saved) root.dataset.theme = saved;
+$("#themeBtn").addEventListener("click", () => {
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark"; store.set("cce2-theme", root.dataset.theme);
+});
+
+/* hero headline: SplitText-style word rise + highlighter sweep */
+if (A){
+  const h1 = $("#heroTitle"), mark = $(".mark", h1);
+  [...h1.childNodes].forEach(n => { if (n.nodeType === 3) { const f = document.createDocumentFragment(); n.textContent.split(/(\s+)/).forEach(p => { if (!p) return; if (/^\s+$/.test(p)) f.append(p); else { const s = document.createElement("span"); s.className = "w"; s.textContent = p; f.append(s); } }); n.replaceWith(f); } });
+  mark.classList.add("w");
+  mark.style.backgroundSize = "0% 100%";
+  A.timeline({easing:"easeOutExpo"})
+    .add({targets:$$(".w", h1), translateY:[24, 0], opacity:[0, 1], duration:1000, delay:A.stagger(60)})
+    .add({targets:mark, backgroundSize:["0% 100%", "100% 100%"], duration:900, easing:"easeInOutQuart"}, "-=350");
+}
+
+/* hero example card */
+(function live(){
+  const ex = [
+    ["FK052", "Two \"not good\"s and a \"waste of money\". A word-counting model sees \"good\" and calls it positive."],
+    ["FK029", "Five stars and the headline \"brilliant\", but the text says \"third class product\". We label the text."],
+    ["FK176", "\"Is it a heater or vacuum cleaner\" is sarcasm about overheating. We label what the writer means."],
+    ["FK021", "\"Jabardast\" is Hindi for excellent. The pad complaint is minor, so the review stays positive."],
+  ];
+  let i = 0, timer, paused = RM;
+  const pips = $("#lvPips");
+  ex.forEach((e, k) => { const b = document.createElement("button"); b.type = "button"; b.setAttribute("aria-label", `Example ${k + 1}`); b.onclick = () => go(k); pips.append(b); });
+  function render(){
+    const [id, why] = ex[i], r = byId[id];
+    $("#lvId").textContent = `${r.id} · ${r.n.split(" ").slice(0, 4).join(" ")}`;
+    $("#lvStars").innerHTML = stars(r.r);
+    $("#lvText").innerHTML = cues(r.t);
+    $("#lvSrc").innerHTML = `<span class="${r.d !== r.s ? "strike" : ""}">${lbl(r.d)}</span>`;
+    $("#lvOur").innerHTML = lbl(r.s);
+    $("#lvWhy").textContent = why;
+    $$("button", pips).forEach((b, k) => b.setAttribute("aria-current", k === i));
+    if (A){
+      const cs = $$("#lvText .cue"); cs.forEach(c => c.style.backgroundSize = "0% 100%");
+      A.timeline({easing:"easeOutQuad"})
+        .add({targets:"#lvText", opacity:[0, 1], translateY:[6, 0], duration:450})
+        .add({targets:cs, backgroundSize:["0% 100%", "100% 100%"], duration:350, delay:A.stagger(110)})
+        .add({targets:"#lvOur .lbl", scale:[1.35, 1], duration:700, easing:"spring(1, 110, 13, 0)"}, "-=100")
+        .add({targets:"#lvWhy", opacity:[0, 1], duration:400}, "-=500");
+    }
+  }
+  const go = k => { i = (k + ex.length) % ex.length; render(); schedule(); };
+  const schedule = () => { clearTimeout(timer); if (!paused) timer = setTimeout(() => go(i + 1), 7000); };
+  $("#lvNext").onclick = () => go(i + 1);
+  const pb = $("#lvPause"); pb.textContent = paused ? "Play" : "Pause";
+  pb.onclick = () => { paused = !paused; pb.textContent = paused ? "Play" : "Pause"; schedule(); };
+  document.addEventListener("visibilitychange", () => document.hidden ? clearTimeout(timer) : schedule());
+  render(); schedule();
+})();
+
+/* process */
+$("#steps").innerHTML = [
+  ["01", "205,052", "Collect", "Kaggle reviews filtered to 57,531 usable ones, then a 300-review sample stratified by stars.", 1],
+  ["02", "3 + 10", "Define", "Three sentiment labels, eight aspects and ten rules for the hard cases.", .75],
+  ["03", "60", "Annotate", "Two independent passes over the reviews, with 60 labelled twice to measure agreement.", .5],
+  ["04", "9", "Validate", "Disagreements settled in a review meeting, producing the final 300 labels.", .25],
+].map(([n, big, h, p]) => `<div class="step"><span class="n">${n}</span><div class="rail"><i></i></div><b>${big}</b><h3>${h}</h3><p>${p}</p></div>`).join("");
+if (A) A({targets:"#steps .rail i", scaleX:[0, 1], duration:900, delay:A.stagger(180, {start:200}), easing:"easeInOutQuart"});
+$("#defs").innerHTML = [
+  ["P", "--pos", "An overall favourable attitude to the product or purchase, even with a minor drawback.", "the mivi bar is stunning loving it worth the price"],
+  ["U", "--neu", "No clear polarity, or positives and negatives balanced with no overall verdict.", "slow function ok baki all ok"],
+  ["N", "--neg", "An overall unfavourable attitude: defects, failures, regret, \"dont buy\", sarcastic criticism.", "grinder is going to stop immediately while grinding"],
+].map(([k, c, d, q]) => `<div class="def" style="--c:var(${c})"><h4>${NAME[k]}</h4><p>${d}</p><q>${esc(q)}</q></div>`).join("");
+const ADDED = new Set(["R2", "R4", "R7"]);
+$("#rules").innerHTML = Object.entries(DATA.rules).map(([k, v]) => `<li><b>${k}</b><span>${esc(v)}${ADDED.has(k) ? "<em>new</em>" : ""}</span></li>`).join("");
+$("#facts").innerHTML = [
+  ["Source", "Kaggle, N. Vaghani"], ["Scraped", "December 2022"], ["Full size", "205,052 reviews"], ["Sample", "300 reviews, 194 products"],
+  ["Average length", `${ST.avg_words} words`], ["Language", "Indian English, some Hinglish"], ["Prices", "₹109 to ₹50,999"], ["Licence", "DbCL v1.0"],
+].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+
+/* agreement */
+(function agreement(){
+  const sc = $("#scale");
+  [[ST.agreement.kappa, "0.735", "main"], [ST.vs_dataset_label.kappa, "", "below"], [ST.vs_star.kappa, "", "below"]].forEach(([v, t, c]) => {
+    const d = document.createElement("div"); d.className = `pin ${c}`; d.style.left = (v * 100) + "%";
+    d.innerHTML = c === "main" ? `<span>${t}</span><i></i>` : `<i></i>`; sc.append(d);
+  });
+  if (A) A({targets:"#scale .pin", left:el => ["0%", el.style.left], duration:1400, delay:A.stagger(120, {start:300}), easing:"easeOutExpo"});
+
+  const disp = Object.fromEntries(DATA.practice.slice(0, 9).map(p => [p.id, p]));
+  const ov = R.filter(r => r.an === "AB").map(r => ({r, a:disp[r.id] ? disp[r.id].a : r.s, b:disp[r.id] ? disp[r.id].b : r.s}));
+  const cnt = {}; ov.forEach(x => cnt[x.a + x.b] = (cnt[x.a + x.b] || 0) + 1);
+  const max = Math.max(...Object.values(cnt));
+  let h = `<div></div>` + ORDER.map(c => `<div class="h">${NAME[c]}</div>`).join("");
+  ORDER.forEach(a => { h += `<div class="h rh">${NAME[a]}</div>`; ORDER.forEach(b => { const n = cnt[a + b] || 0, al = n ? .06 + .84 * n / max : .03; h += `<button type="button" class="${al > .5 ? "dk" : ""}" style="--a:${al.toFixed(3)}" data-a="${a}" data-b="${b}" aria-pressed="false" aria-label="A ${NAME[a]}, B ${NAME[b]}: ${n}">${n}</button>`; }); });
+  const m = $("#matrix"); m.innerHTML = h;
+  const pick = (a, b) => {
+    $$("button", m).forEach(x => x.setAttribute("aria-pressed", x.dataset.a === a && x.dataset.b === b));
+    const hits = ov.filter(x => x.a === a && x.b === b);
+    $("#picked").innerHTML = hits.length ? hits.slice(0, 4).map(x => `<div class="row"><span class="id">${x.r.id}</span><span>${esc(x.r.t)}</span></div>`).join("") + (hits.length > 4 ? `<div class="row"><span></span><span style="color:var(--muted)">and ${hits.length - 4} more</span></div>` : "") : `<p class="empty">No reviews here.</p>`;
+    if (A) A({targets:"#picked .row", opacity:[0, 1], translateY:[6, 0], delay:A.stagger(50), duration:380, easing:"easeOutQuad"});
+  };
+  $$("button", m).forEach(x => x.onclick = () => pick(x.dataset.a, x.dataset.b));
+  pick("U", "P");
+
+  $("#disputes").innerHTML = DATA.practice.slice(0, 9).map(p => { const r = byId[p.id]; return `<details class="drow"><summary><span class="id">${p.id}</span><span class="t">${esc(r.t)}</span><span class="votes">${lbl(p.a)}<span class="arrow">vs</span>${lbl(p.b)}</span></summary><div class="body"><p class="full">"${esc(r.t)}"</p><p>Final label ${lbl(p.final)} &nbsp;${p.rule !== "-" ? `<span class="rulechip">${p.rule}</span>` : ""}${esc(p.why)}</p></div></details>`; }).join("");
+})();
+
+/* practice */
+(function practice(){
+  const P = DATA.practice;
+  let st = store.get("cce2-try"); if (!st || typeof st.i !== "number" || !st.ans) st = {i:0, ans:{}};
+  const save = () => store.set("cce2-try", st);
+  const kappa = pairs => { const n = pairs.length; if (n < 2) return null; const po = pairs.filter(p => p[0] === p[1]).length / n; let pe = 0; ORDER.forEach(l => pe += pairs.filter(p => p[0] === l).length / n * pairs.filter(p => p[1] === l).length / n); return pe === 1 ? null : (po - pe) / (1 - pe); };
+  function draw(anim){
+    const p = P[st.i], r = byId[p.id], mine = st.ans[p.id];
+    $("#tryBar").style.width = ((Object.keys(st.ans).length / P.length) * 100) + "%";
+    $("#tryPos").textContent = `Review ${st.i + 1} of ${P.length} · ${p.id}`;
+    $("#tryStars").innerHTML = mine ? stars(r.r) : "Stars hidden until you answer";
+    $("#tryText").innerHTML = mine ? cues(r.t) : esc(r.t);
+    $("#tryChoices").innerHTML = ORDER.map((l, k) => `<button type="button" class="${l} ${mine === l ? "sel" : ""}" data-l="${l}" ${mine ? "disabled" : ""}>${NAME[l]}<small>${k + 1}</small></button>`).join("");
+    $$("#tryChoices button").forEach(b => b.onclick = () => answer(b.dataset.l));
+    const res = $("#tryResult");
+    res.hidden = !mine;
+    if (mine){
+      res.innerHTML = `<div class="verdict">${mine === p.final ? "Same as the final label." : `The final label was ${NAME[p.final]}.`}</div>
+        <div class="who"><span>Annotator A ${lbl(p.a)}</span><span>Annotator B ${lbl(p.b)}</span><span>Dataset ${lbl(r.d)}</span></div>
+        <p>${p.rule !== "-" ? `<span class="rulechip">${p.rule}</span>` : ""}${esc(p.why)}</p>
+        <div class="try-actions"><button class="btn" type="button" id="tryNext">${st.i < P.length - 1 ? "Next review" : "Back to the first"}</button></div>`;
+      $("#tryNext").onclick = () => { st.i = (st.i + 1) % P.length; save(); draw(true); };
+    }
+    const done = P.filter(q => st.ans[q.id]), ok = done.filter(q => st.ans[q.id] === q.final).length, k = kappa(done.map(q => [st.ans[q.id], q.final]));
+    $("#tryScore").textContent = `${ok}/${done.length}`;
+    $("#tryKappa").textContent = done.length >= 3 && k !== null ? `kappa ${k.toFixed(2)} with the final labels` : "";
+    if (A && anim) A({targets:["#tryText", "#tryChoices"], opacity:[0, 1], translateX:[16, 0], duration:450, delay:A.stagger(60), easing:"easeOutQuad"});
+  }
+  function answer(l){
+    const p = P[st.i]; if (st.ans[p.id]) return;
+    st.ans[p.id] = l; save(); draw();
+    if (A){
+      A({targets:"#tryResult", opacity:[0, 1], translateY:[10, 0], duration:450, easing:"easeOutQuad"});
+      A({targets:"#tryText .cue", backgroundSize:["0% 100%", "100% 100%"], delay:A.stagger(60), duration:300, easing:"easeOutQuad"});
+    }
+  }
+  document.addEventListener("keydown", e => {
+    if (e.target.closest("input,select,textarea") || e.metaKey || e.ctrlKey) return;
+    const b = $("#try").getBoundingClientRect(); if (b.top > innerHeight * .6 || b.bottom < innerHeight * .3) return;
+    const l = {"1":"P", "2":"U", "3":"N"}[e.key]; if (l) answer(l);
+  });
+  $("#tryReset").onclick = () => { st = {i:0, ans:{}}; save(); draw(true); };
+  draw();
+})();
+
+/* findings: tabs ported from ui-layouts Tabs (sliding indicator, direction-aware panel) */
+(function findings(){
+  const tabs = $$("#tabs [role=tab]"), ind = $("#tabInd");
+  let cur = 0;
+  const place = (b, animate) => {
+    const x = b.offsetLeft, w = b.offsetWidth;
+    if (A && animate) A({targets:ind, translateX:x, width:w, duration:500, easing:"spring(1, 120, 16, 0)"});
+    else { ind.style.transform = `translateX(${x}px)`; ind.style.width = w + "px"; }
+  };
+  const show = (k, animate = true) => {
+    const dir = k > cur ? 1 : -1;
+    tabs.forEach((t, j) => { t.setAttribute("aria-selected", j === k); t.tabIndex = j === k ? 0 : -1; $("#" + t.getAttribute("aria-controls")).hidden = j !== k; });
+    place(tabs[k], animate);
+    const pnl = $("#" + tabs[k].getAttribute("aria-controls"));
+    if (A && animate){
+      A({targets:pnl, opacity:[0, 1], translateY:[dir * 12, 0], duration:450, easing:"easeOutQuad"});
+      grow(pnl);
+    }
+    cur = k;
+  };
+  tabs.forEach((t, k) => {
+    t.onclick = () => show(k);
+    t.onkeydown = e => { const d = {ArrowRight:1, ArrowLeft:-1}[e.key]; if (d){ e.preventDefault(); const n = (k + d + tabs.length) % tabs.length; tabs[n].focus(); show(n); } };
+  });
+  addEventListener("resize", () => place(tabs[cur], false));
+  document.fonts && document.fonts.ready.then(() => place(tabs[cur], false));
+  place(tabs[0], false);
+  window.openTab = id => show(tabs.findIndex(t => t.id === id));
+})();
+function grow(pnl){
+  if (!A) return;
+  A({targets:$$(".split .bar div, .arow .bars, .wrow .b", pnl), scaleX:[0, 1], duration:800, delay:A.stagger(25), easing:"easeOutExpo"});
+  A({targets:$$(".dot", pnl), scale:[0, 1], duration:450, delay:A.stagger(2), easing:"easeOutBack", complete:() => $$(".dot", pnl).forEach(d => d.style.transform = "")});
+}
+
+/* split */
+(function split(){
+  const starL = r => r.r >= 4 ? "P" : r.r === 3 ? "U" : "N";
+  $("#split").innerHTML = [["Our labels", "read and adjudicated by hand", r => r.s], ["Dataset labels", "VADER lexicon, shipped with the data", r => r.d], ["Star rating", "4–5 positive, 3 neutral, 1–2 negative", starL]].map(([n, sub, f]) => {
+    const c = {P:0, U:0, N:0}; R.forEach(r => c[f(r)]++);
+    return `<div><div class="nm"><span>${n}</span><small>${sub}</small></div><div class="bar">${ORDER.map(l => `<div class="bg${l}" style="flex:${c[l]} 1 0" data-t="${n}" data-l="${l}" data-n="${c[l]}"></div>`).join("")}</div><div class="vals">${ORDER.map(l => `<span style="flex:${c[l]} 1 0">${c[l]}</span>`).join("")}</div></div>`;
+  }).join("");
+  $$("#split .bar div").forEach(d => { d.style.transformOrigin = "left"; bindTip(d, () => `<b>${d.dataset.t}</b>${NAME[d.dataset.l]}: ${d.dataset.n} of 300 (${(d.dataset.n / 3).toFixed(1)}%)`); });
+})();
+
+/* stars vs text */
+(function heat(){
+  let mode = "n";
+  const c = {}, rowT = {}; R.forEach(r => { c[r.r + r.s] = (c[r.r + r.s] || 0) + 1; rowT[r.r] = (rowT[r.r] || 0) + 1; });
+  const draw = () => {
+    const v = (s, l) => mode === "n" ? (c[s + l] || 0) : (c[s + l] || 0) / rowT[s] * 100;
+    let max = 0; [5,4,3,2,1].forEach(s => ORDER.forEach(l => max = Math.max(max, v(s, l))));
+    let h = `<div></div>` + ORDER.map(l => `<div class="h">${NAME[l]}</div>`).join("");
+    [5,4,3,2,1].forEach(s => { h += `<div class="rh">${stars(s)}</div>`; ORDER.forEach(l => { const x = v(s, l), a = x ? .06 + .84 * x / max : .03, n = c[s + l] || 0; h += `<button type="button" class="${a > .5 ? "dk" : ""}" style="--a:${a.toFixed(3)}" data-s="${s}" data-l="${l}" data-n="${n}" aria-label="${s} stars, ${NAME[l]}: ${n}">${mode === "n" ? n : Math.round(x) + "%"}</button>`; }); });
+    $("#heat").innerHTML = h;
+    $$("#heat button").forEach(b => { bindTip(b, () => `<b>${b.dataset.s} stars · ${NAME[b.dataset.l]}</b>${b.dataset.n} of ${rowT[b.dataset.s]} reviews. Click to list them.`); b.onclick = () => openList({r:b.dataset.s, s:b.dataset.l}); });
+  };
+  draw(); seg("#heatMode", m => { mode = m; draw(); });
+})();
+
+/* aspects */
+(function aspects(){
+  const box = $("#aspects"), c = {};
+  R.forEach(r => { c[r.a] = c[r.a] || {P:0, U:0, N:0, t:0}; c[r.a][r.s]++; c[r.a].t++; });
+  const max = Math.max(...Object.values(c).map(x => x.t));
+  Object.keys(ASP).forEach(k => {
+    const x = c[k], b = document.createElement("button");
+    b.type = "button"; b.className = "arow"; b.dataset.k = k;
+    b.innerHTML = `<span class="nm">${ASP[k]}</span><span class="bars" style="width:${(x.t / max * 100).toFixed(1)}%;transform-origin:left">${ORDER.filter(l => x[l]).map(l => `<div class="bg${l}" style="flex:${x[l]} 1 0"></div>`).join("")}</span><span class="t">${x.t}</span>`;
+    bindTip(b, () => `<b>${ASP[k]}</b>${ORDER.map(l => `${NAME[l]} ${x[l]}`).join(" · ")}, ${(x.N / x.t * 100).toFixed(0)}% negative`);
+    b.onclick = () => openList({a:k}); box.append(b);
+  });
+  let by = "vol";
+  const sort = anim => {
+    const rows = $$(".arow", box), y0 = new Map(rows.map(r => [r, r.getBoundingClientRect().top]));
+    Object.keys(ASP).sort((a, b) => by === "vol" ? c[b].t - c[a].t : c[b].N / c[b].t - c[a].N / c[a].t).forEach(k => box.append($(`[data-k="${k}"]`, box)));
+    if (A && anim) rows.forEach(r => { const dy = y0.get(r) - r.getBoundingClientRect().top; if (dy) A({targets:r, translateY:[dy, 0], duration:600, easing:"easeOutQuart"}); });
+  };
+  sort(false); seg("#aspSort", m => { by = m; sort(true); });
+})();
+
+/* words */
+$("#words").innerHTML = Object.entries(ST.top_words).map(([lab, list]) => {
+  const l = {Positive:"P", Neutral:"U", Negative:"N"}[lab], m = list[0][1];
+  return `<div><h4><i class="sw ${l}"></i>${lab}</h4>${list.slice(0, 7).map(([w, n]) => `<div class="wrow ${l === "N" && w === "good" ? "flag" : ""}"><span class="w">${w}</span><span><div class="b bg${l}" style="width:${(n / m * 100).toFixed(1)}%;transform-origin:left"></div></span><span class="c">${n}</span></div>`).join("")}</div>`;
+}).join("");
+
+/* length strip */
+(function strip(){
+  const lo = 5, hi = 61, pct = v => ((v - lo) / (hi - lo) * 100).toFixed(2) + "%";
+  const hash = s => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
+  let h = "";
+  ORDER.forEach(l => {
+    const rs = R.filter(r => r.s === l), ws = rs.map(r => r.w).sort((a, b) => a - b);
+    const med = ws.length % 2 ? ws[(ws.length - 1) / 2] : (ws[ws.length / 2 - 1] + ws[ws.length / 2]) / 2;
+    h += `<div class="lane"><div class="lane-lab">${NAME[l]}<small>${rs.length} reviews</small></div><div class="lane-plot">`
+      + rs.map(r => `<button type="button" class="dot ${l}" data-id="${r.id}" style="left:${pct(r.w)};top:${(50 + ((hash(r.id) % 1000) / 1000 - .5) * 72).toFixed(1)}%" aria-label="${r.id}, ${r.w} words"></button>`).join("")
+      + `<div class="median" style="left:${pct(med)}"><span>median ${med}</span></div></div></div>`;
+  });
+  h += `<div class="axis"><span></span><div class="ticks">${[10, 20, 30, 40, 50, 60].map(v => `<span style="left:${pct(v)}">${v}</span>`).join("")}</div></div><p class="axis-cap">words per review</p>`;
+  $("#strip").innerHTML = h;
+  $$("#strip .dot").forEach(d => { const r = byId[d.dataset.id]; bindTip(d, () => `<b>${r.id} · ${r.w} words · ${NAME[r.s]}</b>${esc(r.t.length > 140 ? r.t.slice(0, 140) + "…" : r.t)}`); d.onclick = () => openList({q:r.id}); });
+})();
+
+/* hard cases */
+(function hard(){
+  const ex = {M:"FK116", I:"FK128", A:"FK144", S:"FK176"};
+  $("#hard").innerHTML = ["M", "I", "A", "S"].map(f => `<button type="button" data-f="${f}"><b>${R.filter(r => r.f.includes(f)).length}</b><strong>${FLAG[f]}</strong><q>${esc(byId[ex[f]].t.slice(0, 60))}${byId[ex[f]].t.length > 60 ? "…" : ""}</q></button>`).join("");
+  $$("#hard button").forEach(b => b.onclick = () => openList({f:b.dataset.f}));
+  document.addEventListener("pointermove", e => { const c = e.target.closest && e.target.closest("#hard button"); if (!c) return; const r = c.getBoundingClientRect(); c.style.setProperty("--mx", (e.clientX - r.left) + "px"); c.style.setProperty("--my", (e.clientY - r.top) + "px"); });
+})();
+
+/* reviews list */
+const F = {q:"", s:"", a:"", r:"", f:"", n:20, open:null};
+Object.entries(ASP).forEach(([k, v]) => $("#fa").insertAdjacentHTML("beforeend", `<option value="${k}">${v}</option>`));
+const reset = () => { F.n = 20; F.open = null; render(); };
+$("#q").addEventListener("input", e => { F.q = e.target.value; reset(); });
+seg("#fs", v => { F.s = v; reset(); });
+$("#fa").onchange = e => { F.a = e.target.value; reset(); };
+$("#fr").onchange = e => { F.r = e.target.value; reset(); };
+$("#ff").onchange = e => { F.f = e.target.value; reset(); };
+$("#cueToggle").onchange = e => $("#list").classList.toggle("plain", !e.target.checked);
+$("#more").onclick = () => { F.n += 20; render(); };
+function rows(){
+  const q = F.q.trim().toLowerCase();
+  return R.filter(r => {
+    if (F.s && r.s !== F.s) return false;
+    if (F.a && r.a !== F.a) return false;
+    if (F.r && r.r !== +F.r) return false;
+    if (F.f === "mm"){ if ((r.r >= 4 ? "P" : r.r === 3 ? "U" : "N") === r.s) return false; }
+    else if (F.f === "src"){ if (r.d === r.s) return false; }
+    else if (F.f && !r.f.includes(F.f)) return false;
+    return !q || r.t.toLowerCase().includes(q) || r.n.toLowerCase().includes(q) || r.id.toLowerCase() === q;
+  });
+}
+function render(){
+  const list = rows(), active = F.q || F.s || F.a || F.r || F.f;
+  $("#count").innerHTML = `<b>${list.length}</b> of 300 reviews${active ? `<button type="button" id="clear">Clear filters</button>` : ""}`;
+  if (active) $("#clear").onclick = () => { Object.assign(F, {q:"", s:"", a:"", r:"", f:""}); sync(); reset(); };
+  $("#list").innerHTML = list.length ? list.slice(0, F.n).map(r => `<div class="item"><button type="button" aria-expanded="${F.open === r.id}" data-id="${r.id}"><span><span class="tx">${cues(r.t)}</span><span class="meta">${r.id} · ${stars(r.r)} · ${ASP[r.a]}${r.f ? " · " + r.f.split("").map(f => FLAG[f]).join(", ") : ""}</span></span>${lbl(r.s)}</button>${F.open === r.id ? `<dl class="info"><div><dt>Product</dt><dd>${esc(r.n)}</dd></div><div><dt>Price</dt><dd>${r.p ? "₹" + r.p.toLocaleString("en-IN") : "Not listed"}</dd></div><div><dt>Dataset label</dt><dd>${lbl(r.d)}</dd></div><div><dt>Aspect</dt><dd>${ASP[r.a]}</dd></div></dl>` : ""}</div>`).join("") : `<p class="empty">No reviews match. Try removing a filter.</p>`;
+  $("#more").hidden = list.length <= F.n;
+  $$("#list .item > button").forEach(b => b.onclick = () => { F.open = F.open === b.dataset.id ? null : b.dataset.id; render(); });
+}
+function sync(){ $("#q").value = F.q; $("#fa").value = F.a; $("#fr").value = F.r; $("#ff").value = F.f; $$("#fs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === F.s)); }
+function openList(o){
+  Object.assign(F, {q:"", s:"", a:"", r:"", f:"", n:20, open:null}, o);
+  if (o.q && /^FK\d{3}$/i.test(o.q)) F.open = o.q.toUpperCase();
+  sync(); render(); $("#reviews").scrollIntoView({behavior:RM ? "auto" : "smooth"});
+}
+render();
+
+/* readiness */
+$("#checks").innerHTML = [
+  ["Annotation consistency", "ok", "High", "Kappa 0.735, ten written rules, every disagreement settled."],
+  ["Data quality", "ok", "High", "Real buyer text, no empty or duplicate reviews, licence documented."],
+  ["Noise", "warn", "Medium", "Lowercase, no punctuation, merged words; 32 informal or Hinglish reviews."],
+  ["Size", "warn", "Medium", "300 reviews: enough to evaluate a model, not to train one."],
+  ["Class balance", "bad", "Low", "Neutral is 8% of labels, so models will lean towards polar answers."],
+].map(([k, c, t, p]) => `<li><strong>${k}</strong><span class="status ${c}">${t}</span><p>${p}</p></li>`).join("");
+
+/* active nav link */
+const navs = $$(".links a"), io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) navs.forEach(a => a.classList.toggle("on", a.hash === "#" + e.target.id)); }), {rootMargin:"-45% 0px -50% 0px"});
+["process", "agreement", "try", "findings", "reviews"].forEach(id => io.observe(document.getElementById(id)));
+})();
+</script>

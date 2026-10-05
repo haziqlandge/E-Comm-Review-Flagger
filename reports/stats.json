@@ -1,0 +1,343 @@
+{
+  "records": 300,
+  "products": 194,
+  "avg_words": 16.26,
+  "median_words": 11.0,
+  "min_words": 6,
+  "max_words": 60,
+  "avg_chars": 88.1,
+  "vocab": 1291,
+  "rating_counts": {
+    "1": 50,
+    "2": 45,
+    "3": 60,
+    "4": 60,
+    "5": 85
+  },
+  "label_counts": {
+    "Positive": 160,
+    "Neutral": 24,
+    "Negative": 116
+  },
+  "words_by_label": {
+    "Negative": 17.41,
+    "Neutral": 16.33,
+    "Positive": 15.41
+  },
+  "aspect_counts": {
+    "Performance": 85,
+    "Product Quality": 61,
+    "General": 40,
+    "Value for Money": 33,
+    "Durability": 28,
+    "Size, Fit & Comfort": 20,
+    "Delivery & Packaging": 19,
+    "Service & Installation": 14
+  },
+  "aspect_x_sent": {
+    "Delivery & Packaging": {
+      "Positive": 12,
+      "Neutral": 0,
+      "Negative": 7
+    },
+    "Durability": {
+      "Positive": 5,
+      "Neutral": 1,
+      "Negative": 22
+    },
+    "General": {
+      "Positive": 31,
+      "Neutral": 1,
+      "Negative": 8
+    },
+    "Performance": {
+      "Positive": 43,
+      "Neutral": 10,
+      "Negative": 32
+    },
+    "Product Quality": {
+      "Positive": 22,
+      "Neutral": 5,
+      "Negative": 34
+    },
+    "Service & Installation": {
+      "Positive": 10,
+      "Neutral": 1,
+      "Negative": 3
+    },
+    "Size, Fit & Comfort": {
+      "Positive": 7,
+      "Neutral": 6,
+      "Negative": 7
+    },
+    "Value for Money": {
+      "Positive": 30,
+      "Neutral": 0,
+      "Negative": 3
+    }
+  },
+  "rating_x_sent": {
+    "1": {
+      "Positive": 1,
+      "Neutral": 0,
+      "Negative": 49
+    },
+    "2": {
+      "Positive": 0,
+      "Neutral": 6,
+      "Negative": 39
+    },
+    "3": {
+      "Positive": 24,
+      "Neutral": 12,
+      "Negative": 24
+    },
+    "4": {
+      "Positive": 53,
+      "Neutral": 4,
+      "Negative": 3
+    },
+    "5": {
+      "Positive": 82,
+      "Neutral": 2,
+      "Negative": 1
+    }
+  },
+  "flag_counts": {
+    "Mixed": 73,
+    "Sarcasm": 3,
+    "Informal/Code-mixed": 32,
+    "Ambiguous": 25
+  },
+  "any_flag": 110,
+  "mismatch": 53,
+  "agreement": {
+    "n": 60,
+    "agree": 51,
+    "po": 0.85,
+    "pe": 0.43333333333333335,
+    "kappa": 0.7352941176470588,
+    "confusion": {
+      "Positive": {
+        "Positive": 28,
+        "Neutral": 2,
+        "Negative": 0
+      },
+      "Neutral": {
+        "Positive": 3,
+        "Neutral": 1,
+        "Negative": 2
+      },
+      "Negative": {
+        "Positive": 1,
+        "Neutral": 1,
+        "Negative": 22
+      }
+    }
+  },
+  "top_words": {
+    "Positive": [
+      [
+        "good",
+        92
+      ],
+      [
+        "nice",
+        44
+      ],
+      [
+        "quality",
+        33
+      ],
+      [
+        "price",
+        18
+      ],
+      [
+        "best",
+        17
+      ],
+      [
+        "delivery",
+        14
+      ],
+      [
+        "sound",
+        12
+      ],
+      [
+        "money",
+        11
+      ],
+      [
+        "happy",
+        11
+      ],
+      [
+        "awesome",
+        11
+      ]
+    ],
+    "Neutral": [
+      [
+        "good",
+        14
+      ],
+      [
+        "quality",
+        6
+      ],
+      [
+        "sound",
+        4
+      ],
+      [
+        "small",
+        4
+      ],
+      [
+        "working",
+        4
+      ],
+      [
+        "size",
+        4
+      ],
+      [
+        "dont",
+        3
+      ],
+      [
+        "bad",
+        3
+      ],
+      [
+        "level",
+        3
+      ],
+      [
+        "price",
+        2
+      ]
+    ],
+    "Negative": [
+      [
+        "quality",
+        39
+      ],
+      [
+        "good",
+        24
+      ],
+      [
+        "dont",
+        18
+      ],
+      [
+        "money",
+        17
+      ],
+      [
+        "waste",
+        14
+      ],
+      [
+        "bad",
+        14
+      ],
+      [
+        "working",
+        9
+      ],
+      [
+        "month",
+        8
+      ],
+      [
+        "worst",
+        8
+      ],
+      [
+        "poor",
+        7
+      ]
+    ]
+  },
+  "bigrams": [
+    [
+      "quality is",
+      22
+    ],
+    [
+      "very good",
+      22
+    ],
+    [
+      "good product",
+      19
+    ],
+    [
+      "is good",
+      19
+    ],
+    [
+      "nice product",
+      16
+    ],
+    [
+      "not good",
+      15
+    ],
+    [
+      "of money",
+      13
+    ],
+    [
+      "very nice",
+      13
+    ],
+    [
+      "very bad",
+      11
+    ],
+    [
+      "this price",
+      10
+    ],
+    [
+      "good but",
+      10
+    ],
+    [
+      "dont buy",
+      10
+    ]
+  ],
+  "review_titles_unique": 63,
+  "review_title_null": 23,
+  "vs_dataset_label": {
+    "agree_pct": 80.0,
+    "kappa": 0.638,
+    "crosstab": {
+      "Negative": {
+        "Negative": 87,
+        "Neutral": 15,
+        "Positive": 14
+      },
+      "Neutral": {
+        "Negative": 9,
+        "Neutral": 3,
+        "Positive": 12
+      },
+      "Positive": {
+        "Negative": 3,
+        "Neutral": 7,
+        "Positive": 150
+      }
+    }
+  },
+  "vs_star": {
+    "agree_pct": 78.3,
+    "kappa": 0.641
+  }
+}
